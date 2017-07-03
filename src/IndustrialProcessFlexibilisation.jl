@@ -1,8 +1,4 @@
-# include("F:/Univ/_PhD/InduStore/Hg/WeeklyPlanning/src/IndustrialProcessFlexibilisation.jl")
-# using IndustrialProcessFlexibilisation
-
 module IndustrialProcessFlexibilisation
-
   ## Exports for data structures (data/).
   # Genera data structures (data/)
   export Timing
@@ -57,9 +53,9 @@ module IndustrialProcessFlexibilisation
   using JuMP
   using Nemo
 
-  solve = JuMP.solve # Resolve conflict between Nemo and JuMP
-
   using HDF5
+
+  solve = JuMP.solve # Resolve conflict between Nemo and JuMP
 
   import Base: start, next, done, eltype, length, copy, find, ==, hash, writecsv, replace, convert
   import Base.Random: rand
@@ -69,7 +65,4 @@ module IndustrialProcessFlexibilisation
   include("io/datastructures_io.jl")
   include("io/results_io.jl")
   include("utils/price.jl")
-
 end
-
-using IndustrialProcessFlexibilisation # TODO: Remove me.

@@ -28,7 +28,7 @@ function teamModel(neededTeamsForShifts::Array{Int, 1}, hoursPerShift::Int, time
                    coeffs::NTuple{5, Float64}=(1., 1., 500., 1000., 0.),
                    fixedSchedule::BitArray{2}=falses(0, 0),
                    initialSolution::BitArray{2}=falses(0, 0), initialSolutionMode::Symbol=:none;
-                   solver::MathProgBase.AbstractMathProgSolver=JuMP.UnsetSolver(), outfile="m_1.lp")
+                   solver::MathProgBase.AbstractMathProgSolver=JuMP.UnsetSolver(), outfile="")
   ## Derived data from inputs.
   # Basic counting and dividing.
   nTeams = length(canWorkDays)
@@ -302,7 +302,9 @@ function teamModel(neededTeamsForShifts::Array{Int, 1}, hoursPerShift::Int, time
            getobjectivevalue(m),
            hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair
   else
-    writeLP(m, outfile, genericnames=false)
+    if length(outfile) > 0
+      writeLP(m, outfile, genericnames=false)
+    end
     return false, m, Bool[], Bool[], Bool[],
            0.0, Float64[], Float64[], Float64[], 0.0, 0.0
   end

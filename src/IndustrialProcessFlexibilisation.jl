@@ -6,7 +6,7 @@ module IndustrialProcessFlexibilisation
   ## Exports for data structures (data/).
   # Genera data structures (data/)
   export Timing
-  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, shiftBeginning, shiftDuration, nOccurrencesPerPeriod, nTimeSteps, nTimeStepsPerShift, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTieStep, dateToShift, shift
+  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, shiftBeginning, shiftDuration, nOccurrencesPerPeriod, nTimeSteps, nTimeStepsPerShift, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep, dateToShift, shift
   # Plant data structures (data/plant/)
   export ConsumptionModel, NoConsumption, ConstantConsumption, LinearConsumption, QuadraticConsumption, PiecewiseLinearConsumption,
          AbstractEquipment, Equipment, ImplicitEquipment, InImplicitEquipment, OutImplicitEquipment, inEquipment, outEquipment,
@@ -24,7 +24,7 @@ module IndustrialProcessFlexibilisation
   ## Exports for models (model/).
   # Actual optimisation models (model/).
   export productionModel,
-         teamModel, shiftFixedSchedule,
+         teamModel, shiftFixedSchedule, shiftsFiveEight, 
          modelMultiple, shiftsAsLetters, countShifts, countShiftSequences, findCycles
   # Model data structures, mimicking the previous data structures (model/ds/).
   export AbstractEquipmentModel, EquipmentModel, ImplicitEquipmentModel, EquipmentModel,

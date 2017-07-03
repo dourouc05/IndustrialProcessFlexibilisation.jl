@@ -64,11 +64,13 @@ struct Plant
     # Determine the list of pieces of equipment.
     equipments = [from(r) for r in routes]
     push!(equipments, [to(r) for r in routes]...)
-    equipments = unique(equipments)
+    equipments = unique(equipments) # Remove duplicates: if an element is present between two others, then it is in
+    # two routes (A -> that, that -> B), and is thus twice in the equipments variable.
 
-    # Check whether names are unique.
-    if length([name(e) for e in equipments]) != length(unique([name(e) for e in equipments]))
-      error("Equipment names are not unique within the plant.")
+    # Check whether equipment names are unique.
+    equipmentNames = [name(e) for e in equipments]
+    if length(equipmentNames) != length(unique(equipmentNames))
+      error("Some equipment names are not unique within the plant.")
     end
 
     # Sanity checks done.

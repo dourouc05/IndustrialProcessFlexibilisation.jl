@@ -46,8 +46,8 @@ minimumProduction(e::Equipment) = e.minimumProduction
 maximumProduction(e::Equipment) = e.maximumProduction
 processTime(e::Equipment) = e.processTime
 
-==(e1::Equipment, e2::Equipment) = name(e1) == name(e2)
-hash(e::Equipment) = hash(name(e)) # More efficient hashing for equipment objects: the name is enough (supposed to be unique).
+==(e1::Equipment, e2::Equipment) = (name(e1) == name(e2) && kind(e1) == kind(e2))
+hash(e::Equipment) = hash(name(e) * string(kind(e))) # More efficient hashing for equipment objects.
 
 
 

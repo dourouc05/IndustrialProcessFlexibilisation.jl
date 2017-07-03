@@ -3,7 +3,7 @@
     @testset "Timing" begin
       date = DateTime(2017, 01, 01, 08)
       t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
-      m = Model(solver=GurobiSolver(OutputFlag=0))
+      m = Model(solver=CbcSolver(logLevel=0))
       hrm = TimingModel(m, t)
 
       @test(timing(hrm) == t)
@@ -43,7 +43,7 @@
       # TODO: More involved tests: the beginning of the shifts is four hours before the optimisation.
       date = DateTime(2017, 01, 01, 08)
       t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
-      m = Model(solver=GurobiSolver(OutputFlag=0))
+      m = Model(solver=CbcSolver(logLevel=0))
       hrm = TimingModel(m, t)
 
       @test_throws(ErrorException, dateToShift(hrm, date - Hour(4) - Hour(1)))
@@ -76,7 +76,7 @@
       date = DateTime(2017, 01, 01, 08)
       t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
 
-      m = Model(solver=GurobiSolver(OutputFlag=0))
+      m = Model(solver=CbcSolver(logLevel=0))
       pm = PlantModel(m, p, ob, t)
 
       # Basic accessors.
@@ -97,7 +97,7 @@
         # Check the constraints behave as expected.
         # First shift 8:00-16:00: if the second time step is open, then the shift is open. (Actually, this constraint is
         # automatically rewritten as a shift opening.)
-        m = Model(solver=GurobiSolver(OutputFlag=0))
+        m = Model(solver=CbcSolver(logLevel=0))
         hrm = TimingModel(m, t)
         postConstraints(m, hrm)
         @constraint(m, timeStepOpen(hrm, date + Hour(1)) == 1.)
@@ -105,7 +105,7 @@
         @test(getvalue(shiftOpen(hrm, 1)) == 1.0)
 
         # If the shift 16:00-0:00 is open, and if only one shift is allowed, then the maximum number of time steps is eight.
-        m = Model(solver=GurobiSolver(OutputFlag=0))
+        m = Model(solver=CbcSolver(logLevel=0))
         hrm = TimingModel(m, t)
         postConstraints(m, hrm)
         @constraint(m, shiftOpen(hrm, 1) == 0.)
@@ -123,7 +123,7 @@
         t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
 
         # If the first shift is open, can work at most four hours.
-        m = Model(solver=GurobiSolver(OutputFlag=0))
+        m = Model(solver=CbcSolver(logLevel=0))
         hrm = TimingModel(m, t)
         postConstraints(m, hrm)
         @constraint(m, shiftOpen(hrm, 1) == 1.)
@@ -176,7 +176,7 @@
     o = ObjectiveCombination([eo, hro])
 
     # The model should be built without error.
-    status, pm, m, shiftsOpen, productionRaw = productionModel(p, ob, t, o, solver=GurobiSolver(OutputFlag=0))
+    status, pm, m, shiftsOpen, productionRaw = productionModel(p, ob, t, o, solver=CbcSolver(logLevel=0))
     @test(status)
   end
 

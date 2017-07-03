@@ -24,7 +24,7 @@ module IndustrialProcessFlexibilisation
   ## Exports for models (model/).
   # Actual optimisation models (model/).
   export productionModel,
-         teamModel, shiftFixedSchedule, shiftsFiveEight, 
+         teamModel, shiftFixedSchedule, shiftsFiveEight,
          modelMultiple, shiftsAsLetters, countShifts, countShiftSequences, findCycles
   # Model data structures, mimicking the previous data structures (model/ds/).
   export AbstractEquipmentModel, EquipmentModel, ImplicitEquipmentModel, EquipmentModel,
@@ -59,7 +59,6 @@ module IndustrialProcessFlexibilisation
 
   solve = JuMP.solve # Resolve conflict between Nemo and JuMP
 
-  using JSON
   using HDF5
 
   import Base: start, next, done, eltype, length, copy, find, ==, hash, writecsv, replace, convert

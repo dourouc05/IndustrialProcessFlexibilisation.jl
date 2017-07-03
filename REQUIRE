@@ -1,1 +1,5 @@
 julia 0.6
+JuMP 0.17
+TimeSeries 0.10
+Nemo 0.6
+HDF5 0.8

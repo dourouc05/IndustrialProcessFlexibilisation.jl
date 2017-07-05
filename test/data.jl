@@ -94,6 +94,7 @@
       r2 = NormalRoute(e2, e3)
       le = [e1, e2, e3]
       ele = [e1, e2, e3, inEquipment, outEquipment]
+      elk = [:eaf, :lf, :cc, :in, :out]
       lr = Route[r1, r2]
       # @test(Plant(le, lr) == Plant(le, lr)) # Check whether there is no error when building the plant object. TODO: How to check the object is built without error? See when migrating to Julia 0.5's test infrastructure.
       p = Plant(le, lr)
@@ -101,6 +102,10 @@
       @test(all((r) -> in(r, equipments(p)), ele))
       @test(all((r) -> in(r, ele), equipments(p)))
       @test(length(ele) == length(equipments(p)))
+
+      @test(all((r) -> in(r, kinds(p)), elk))
+      @test(all((r) -> in(r, elk), kinds(p)))
+      @test(length(elk) == length(kinds(p)))
 
       @test(all((r) -> in(r, routes(p)), lr))
       @test(all((r) -> in(r, lr), routes(p)))
@@ -133,13 +138,20 @@
       le = [e1, e2, e3]
       lr = Route[r1, r2]
       @test_throws(ErrorException, Plant(lr))
+    end
 
+    @testset "Debug constructor" begin
       # Test ill-formed input: multiple pieces of equipments, but no routes.
+      e1 = Equipment("EAF", :eaf)
+      e2 = Equipment("LF", :lf) 
+      e3 = Equipment("CC", :cc)
+      r1 = NormalRoute(e1, e2)
+      r2 = NormalRoute(e2, e3)
       le = [e1, e2, e3]
       lr = Route[]
-      @test_throws(ErrorException, Plant(le, lr) == Plant(le, lr))
+      @test_throws(ErrorException, Plant(le, lr))
 
-      # Test ill-formed input (debug constructor): nonunique names.
+      # Test ill-formed input: nonunique names.
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("EAF", :lf) # Not "LF"
       e3 = Equipment("CC", :cc)
@@ -147,9 +159,9 @@
       r2 = NormalRoute(e2, e3)
       le = [e1, e2, e3]
       lr = Route[r1, r2]
-      @test_throws(ErrorException, Plant(le, lr) == Plant(le, lr))
+      @test_throws(ErrorException, Plant(le, lr))
 
-      # Test ill-formed input (debug constructor): equipment in no route.
+      # Test ill-formed input: equipment in no route.
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("LF", :lf)
       e3 = Equipment("CC", :cc)
@@ -158,9 +170,19 @@
       r2 = NormalRoute(e2, e3)
       le = [e1, e2, e3, e4]
       lr = Route[r1, r2]
-      @test_throws(ErrorException, Plant(le, lr) == Plant(le, lr))
+      @test_throws(ErrorException, Plant(le, lr))
 
-      # Test ill-formed input (debug constructor): route with nonexistent equipment.
+      # Test ill-formed input: origin equipment of a route missing.
+      e1 = Equipment("EAF", :eaf)
+      e2 = Equipment("LF", :lf)
+      e3 = Equipment("CC", :cc)
+      le = [e2, e3] # No e1.
+      r1 = NormalRoute(e1, e2)
+      r2 = NormalRoute(e2, e3)
+      lr = Route[r1, r2]
+      @test_throws(ErrorException, Plant(le, lr))
+
+      # Test ill-formed input: end equipment of a route missing.
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("LF", :lf)
       e3 = Equipment("CC", :cc)
@@ -168,9 +190,18 @@
       r2 = NormalRoute(e2, e3)
       le = [e1, e2] # No e3.
       lr = Route[r1, r2]
-      @test_throws(ErrorException, Plant(le, lr) == Plant(le, lr))
+      @test_throws(ErrorException, Plant(le, lr))
 
-      # Link requirements between a product and a plant.
+      # Test ill-formed input: multiple pieces of equipment, no routes.
+      e1 = Equipment("EAF", :eaf)
+      e2 = Equipment("LF", :lf)
+      e3 = Equipment("CC", :cc)
+      le = [e1, e2, e3]
+      lr = Route[]
+      @test_throws(ErrorException, Plant(le, lr))
+    end
+
+    @testset "Requirements between a product and a plant" begin
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("LF", :lf)
       e3 = Equipment("CC", :cc)
@@ -208,10 +239,20 @@
       r2 = NormalRoute(e2, e3)
       lr = Route[r1, r2]
       p = Plant(lr)
+
       @test(routes(p, from=e1) == [r1])
       @test(routes(p, from=:eaf) == [r1])
       @test(routes(p, to=e2) == [r1])
       @test(routes(p, to=:lf) == [r1])
+
+      @test(routes(p, from=e1, mode=:Normal) == routes(p, from=e1))
+      @test(routes(p, from=:eaf, mode=:Normal) == routes(p, from=:eaf))
+      @test(routes(p, to=e2, mode=:Normal) == routes(p, to=e2))
+      @test(routes(p, to=:lf, mode=:Normal) == routes(p, to=:lf))
+      @test(routes(p, from=e1, mode=:Abnormal) == Route[])
+      @test(routes(p, from=:eaf, mode=:Abnormal) == Route[])
+      @test(routes(p, to=e2, mode=:Abnormal) == Route[])
+      @test(routes(p, to=:lf, mode=:Abnormal) == Route[])
 
       # Multiple routes in output.
       e1 = Equipment("EAF A", :eaf)
@@ -230,6 +271,32 @@
       @test(routes(p, from=:eaf) == [r1, r2, r3])
       @test(routes(p, to=e5) == [r4, r5])
       @test(routes(p, to=:cc) == [r4, r5])
+
+      # Distinguish normal and abnormal routes.
+      e1 = Equipment("EAF A", :eaf)
+      e2 = Equipment("EAF B", :eaf)
+      e3 = Equipment("LF A", :lf)
+      e4 = Equipment("LF B", :lf)
+      e5 = Equipment("CC", :cc)
+      r1 = NormalRoute(e1, e3)
+      r2 = NormalRoute(e2, e4)
+      r3 = AbnormalRoute(e1, e4)
+      r4 = NormalRoute(e3, e5)
+      r5 = AbnormalRoute(e4, e5)
+      lr = Route[r1, r2, r3, r4, r5]
+      p = Plant(lr)
+      @test(routes(p, from=e1) == [r1, r3])
+      @test(routes(p, from=e1, mode=:Normal) == [r1])
+      @test(routes(p, from=e1, mode=:Abnormal) == [r3])
+      @test(routes(p, from=:eaf) == [r1, r2, r3])
+      @test(routes(p, from=:eaf, mode=:Normal) == [r1, r2])
+      @test(routes(p, from=:eaf, mode=:Abnormal) == [r3])
+      @test(routes(p, to=e5) == [r4, r5])
+      @test(routes(p, to=e5, mode=:Normal) == [r4])
+      @test(routes(p, to=e5, mode=:Abnormal) == [r5])
+      @test(routes(p, to=:cc) == [r4, r5])
+      @test(routes(p, to=:cc, mode=:Normal) == [r4])
+      @test(routes(p, to=:cc, mode=:Abnormal) == [r5])
     end
   end
 

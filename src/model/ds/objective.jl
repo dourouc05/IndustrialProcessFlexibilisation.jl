@@ -270,6 +270,11 @@ objectiveShift(m::Model, nobj::NoObjective, pm::PlantModel, d::DateTime) = AffEx
 Electricity prices. The electricity price is given as a time series `TimeArray`. Each equipment that has a consumption
 in the plant model is concerned.
 
+This objective offers two constructors:
+
+  * one that performs sanity checks using a `Timing` object: there must be price information for each time step
+  * one that performs no sanity checks; in this case, you might have failures down the line
+
 Note: Currently, the library considers that the only energy is electricity.
 """
 struct EnergyObjective <: ProductionObjective
@@ -283,7 +288,10 @@ struct EnergyObjective <: ProductionObjective
     end
     return new(electricityPrice)
   end
-  # TODO: Constructor that also takes a Timing object and checks whether there is information when required? (I.e. a point every time step.)
+
+  function EnergyObjective(electricityPrice::TimeArray)
+    return new(electricityPrice)
+  end
 end
 
 """

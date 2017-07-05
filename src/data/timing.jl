@@ -41,7 +41,7 @@ end
 timeBeginning(t::Timing) = t.timeBeginning
 timeHorizon(t::Timing) = t.timeHorizon
 timeStepDuration(t::Timing) = t.timeStepDuration
-timeEnding(t::Timing) = timeBeginning(t) + timeHorizon(t) - timeStepDuration(t) 
+timeEnding(t::Timing) = timeBeginning(t) + timeHorizon(t) - timeStepDuration(t)
 shiftBeginning(t::Timing) = t.shiftBeginning
 shiftDuration(t::Timing) = t.shiftDuration
 
@@ -56,11 +56,11 @@ daysOfWeekBetween(b::DateTime, e::DateTime) = map(d -> dayofweek(d), b:Day(1):e)
 daysOfWeekUntil(t::Timing, until::DateTime) = daysOfWeekBetween(timeBeginning(t), until)
 daysOfWeekFor(t::Timing, duration::Period) = daysOfWeekUntil(t, timeBeginning(t) + duration)
 
+"""
+Loops over the time steps, from `from` (by default, the start of the optimisation) to `to` (by default, the end of
+optimisation), not inclusive for `to`. Alternatively, instead of `to`, a `duration` can be given (also not inclusive).
+"""
 function eachTimeStep(t::Timing; from::DateTime=timeBeginning(t), kwargs...)
-  """
-  Loops over the time steps, from `from` (by default, the start of the optimisation) to `to` (by default, the end of
-  optimisation), not inclusive for `to`. Alternatively, instead of `to`, a `duration` can be given (also not inclusive).
-  """
   if length(kwargs) == 0
     # Most usual case: loop over all time steps, from the given start to the end of optimisation.
     return from : timeStepDuration(t) : timeBeginning(t) + timeHorizon(t) - timeStepDuration(t)

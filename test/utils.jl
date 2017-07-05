@@ -29,4 +29,18 @@
     @test(colnames(ts_new) == colnames(ts))
     @test isapprox(values(ts_new), ts_ref, atol=1.e-4)
   end
+
+  @testset "Objective shortcut" begin
+    date = DateTime(2017, January, 1, 6)
+    t = Timing(timeBeginning=date, timeHorizon=Week(4), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+    epDates = collect(date:Hour(1):date + Week(52))
+    epRaw = 50 + 20 * sin.(1:length(epDates))
+    ep = TimeArray(epDates, epRaw)
+
+    eo = EnergyObjective(ep, t)
+
+    @test(values(electricityPrice(smooth(eo, 3, 3, 8))) == values(smooth(ep, 3, 3, 8)))
+    @test(values(electricityPrice(changeVolatility(eo, 1.15))) == values(changeVolatility(ep, 1.15)))
+  end
 end

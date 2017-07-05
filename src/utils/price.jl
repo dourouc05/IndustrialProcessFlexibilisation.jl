@@ -67,5 +67,5 @@ end
 
 
 
-smooth(eo::EnergyObjective, daysExact::Int, daysSmoothed::Int, daysApproximate::Int; kwargs...) = EnergyObjective(smooth(electricityPrice(eo), daysExact, daysSmoothed, daysApproximate; kwargs...)) # TODO: To test!
-changeVolatility(eo::EnergyObjective, factor::Float64) = EnergyObjective(changeVolatility(electricityPrice(eo), factor)) # TODO: To test!
+smooth(eo::EnergyObjective, daysExact::Int, daysSmoothed::Int, daysApproximate::Int; kwargs...) = EnergyObjective(smooth(electricityPrice(eo), daysExact, daysSmoothed, daysApproximate; kwargs...), ) 
+changeVolatility(eo::EnergyObjective, factor::Float64) = EnergyObjective(changeVolatility(electricityPrice(eo), factor))

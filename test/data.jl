@@ -595,10 +595,13 @@
       @test_throws(ErrorException, eachTimeStep(t, duration=d)) # Bad type for duration
       @test_throws(ErrorException, eachTimeStep(t, to=Hour(1))) # Bad type for to
       @test_throws(ErrorException, eachTimeStep(t, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+      @test_throws(ErrorException, eachTimeStep(t, to=1)) # Invalid argument type.
+
       @test_throws(ErrorException, eachTimeStep(t, from=d, to=d, duration=d)) # Can't set both
       @test_throws(ErrorException, eachTimeStep(t, from=d, duration=d)) # Bad type for duration
       @test_throws(ErrorException, eachTimeStep(t, from=d, to=Hour(1))) # Bad type for to
       @test_throws(ErrorException, eachTimeStep(t, from=d, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+      @test_throws(TypeError, eachTimeStep(t, from=1)) # Invalid argument type.
 
       # eachTimeStep, with the to argument
       dur = Day(3)

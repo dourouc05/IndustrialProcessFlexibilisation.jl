@@ -82,6 +82,15 @@
     @test(destination(r1) == to(r1))
     @test(! isnormal(r1))
     @test(isabnormal(r1))
+
+    # Implementing a custom route without respecting the interface.
+    cr = ConcreteRoute()
+    @test_throws ErrorException from(cr)
+    @test_throws ErrorException to(cr)
+    @test_throws ErrorException origin(cr)
+    @test_throws ErrorException destination(cr)
+    @test_throws ErrorException isnormal(cr)
+    @test_throws ErrorException isabnormal(cr)
   end
 
   @testset "Plant" begin
@@ -143,7 +152,7 @@
     @testset "Debug constructor" begin
       # Test ill-formed input: multiple pieces of equipments, but no routes.
       e1 = Equipment("EAF", :eaf)
-      e2 = Equipment("LF", :lf) 
+      e2 = Equipment("LF", :lf)
       e3 = Equipment("CC", :cc)
       r1 = NormalRoute(e1, e2)
       r2 = NormalRoute(e2, e3)
@@ -198,6 +207,15 @@
       e3 = Equipment("CC", :cc)
       le = [e1, e2, e3]
       lr = Route[]
+      @test_throws(ErrorException, Plant(le, lr))
+
+      # Test ill-formed input: one piece of equipment, routes.
+      e1 = Equipment("EAF", :eaf)
+      e2 = Equipment("LF", :lf)
+      le = [e1]
+      r1 = NormalRoute(e1, e2)
+      r2 = NormalRoute(e2, e3)
+      lr = Route[r1, r2]
       @test_throws(ErrorException, Plant(le, lr))
     end
 

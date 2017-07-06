@@ -10,8 +10,8 @@ to(r::Route) = r.to
 origin(r::Route) = from(r)
 destination(r::Route) = to(r)
 
-isnormal(r::Route) = error("Ths function has not been defined for the given type.")
-isabnormal(r::Route) = error("Ths function has not been defined for the given type.")
+isnormal(r::Route) = error("This function has not been defined for the given type.")
+isabnormal(r::Route) = error("This function has not been defined for the given type.")
 
 """
 A normal route between two pieces of equipment, i.e. the one that is always preferred, except in specific circumstances

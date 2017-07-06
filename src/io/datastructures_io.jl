@@ -3,7 +3,8 @@ function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=tru
     error("Not yet implemented: can only export the orders per shift for now.")
   end
 
-  # Order book restricted to the period of the timing object if required.
+  # Order book restricted to the period of the timing object if required. Mostly equivalent to removing the orders
+  # before the beginning of Timing. 
   if restrictToTiming
     nob = fromto(ob, timeBeginning(timing), timeEnding(timing))
   else
@@ -11,9 +12,9 @@ function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=tru
   end
 
   # Main loop over each product.
-  obMatrix = zeros(nShifts(timing), nProducts(ob))
-  for pid in 1:nProducts(ob)
-    prod = productFromId(ob, pid)
+  obMatrix = zeros(nShifts(timing), nProducts(nob))
+  for pid in 1:nProducts(nob)
+    prod = productFromId(nob, pid)
     db = dueBy(nob, timeBeginning(timing), cumulative=true)
     t = 1 # Time index in obMatrix.
     if haskey(db, prod) # If order at the first time index, fill it.
@@ -24,7 +25,7 @@ function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=tru
     # necessarily have the same frequency as the output of this function. Hence integrate between two output time
     # indices. dueBy allows integrating from the beginning of times.
     d = timeBeginning(timing) + shiftDuration(timing)
-    while d < timeBeginning(timing) + timeHorizon(timing)
+    while d < timeEnding(timing)
       # Go to the next output time index.
       t += 1
       d += shiftDuration(timing)

@@ -125,7 +125,7 @@ productIds(eq::AbstractEquipmentModel) = productIds(orderBook(eq))
 maxBatchSize(p::Product, eq::EquipmentModel) = maxBatchSize(p, equipment(eq))
 minBatchSize(p::Product, eq::EquipmentModel) = minBatchSize(p, equipment(eq))
 
-# Specific model accessors (need the sub-objects accessors).
+# Specific model accessors: low level.
 quantity(eq::AbstractEquipmentModel) = eq.quantity
 flowIn(eq::EquipmentModel) = eq.flowIn
 flowOut(eq::EquipmentModel) = eq.flowOut
@@ -134,22 +134,25 @@ start(eq::EquipmentModel) = eq.start
 currentProduct(eq::EquipmentModel) = eq.currentProduct
 currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the downstream piece of equipment.")
 
+# Specific model accessors: high level.
 quantity(eq::EquipmentModel, ts::Int, nProduct::Int) = quantity(eq)[ts, nProduct]
 flowIn(eq::EquipmentModel, ts::Int, nProduct::Int) = flowIn(eq)[ts, nProduct]
 flowOut(eq::EquipmentModel, ts::Int, nProduct::Int) = flowOut(eq)[ts, nProduct]
 on(eq::EquipmentModel, ts::Int) = on(eq)[ts]
 start(eq::EquipmentModel, ts::Int) = start(eq)[ts]
-currentProduct(eq::EquipmentModel, ts::Int, nProduct::Int) = currentProduct(eq)[ts, nProduct]
+currentProduct(eq::EquipmentModel, ts::Int, nProduct::Int) = if nProducts(eq) > 1; currentProduct(eq)[ts, nProduct]; else; error("Only one product, currentProduct makes no sense"); end
 
 quantity(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantity[ts, nProduct]
 flowIn(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :out; quantity(eq)[ts, nProduct]; else; error("Implicit in equipment has no flow in."); end
 flowOut(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :in; quantity(eq)[ts, nProduct]; else; error("Implicit out equipment has no flow out."); end
-currentProduct(eq::EquipmentModel, d::DateTime, p::Product) = currentProduct(eq, dateToTimeStep(eq, d), productId(eq, p))
 
 # Easy-to-use model accessors.
 function checkDate(eq::AbstractEquipmentModel, d::DateTime, variable::Symbol) # TODO: To test! Same with the following function when they used to error.
   if d > timeEnding(eq)
-    error("Asked time " * string(d) * " is beyond the optimisation horizon " * string(timeBeginning(eq) + timeHorizon(eq)) * " for the variable " * string(variable))
+    error("Asked time " * string(d) * " is beyond the optimisation horizon " * string(timeEnding(eq)) * " for the variable " * string(variable))
+  end
+  if d < timeBeginning(eq)
+    error("Asked time " * string(d) * " is before the beginning of the optimisation horizon " * string(timeBeginning(eq)) * " for the variable " * string(variable))
   end
   return true
 end
@@ -160,6 +163,7 @@ flowIn(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :
 flowOut(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :flowOut) && flowOut(eq, dateToTimeStep(eq, d), productId(eq, p))
 on(eq::EquipmentModel, d::DateTime) = checkDate(eq, d, :on) && on(eq, dateToTimeStep(eq, d)) # Undefined for ImplicitEquipmentModel.
 start(eq::EquipmentModel, d::DateTime) = checkDate(eq, d, :start) && start(eq, dateToTimeStep(eq, d)) # Undefined for ImplicitEquipmentModel.
+currentProduct(eq::EquipmentModel, d::DateTime, p::Product) = currentProduct(eq, dateToTimeStep(eq, d), productId(eq, p))
 
 off(eq::EquipmentModel, d::DateTime) = 1 - on(eq, d) # Undefined for ImplicitEquipmentModel.
 stop(eq::EquipmentModel, d::DateTime) = if d - processTime(eq) >= timeBeginning(eq); start(eq, d - processTime(eq)); else 0; end # Undefined for ImplicitEquipmentModel. TODO: What happens before optimisation horizon?

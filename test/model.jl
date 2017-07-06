@@ -134,6 +134,75 @@
       @test(minBatchSize(p, eqm) == minBatchSize(p, e))
       @test_throws(MethodError, minBatchSize(p, inm))
       @test_throws(MethodError, minBatchSize(p, oum))
+
+      # Accessing variables (low level).
+      for em in [eqm, inm, oum]
+        @test(quantity(em) == em.quantity)
+      end
+      @test(flowIn(eqm) == eqm.flowIn)
+      @test(flowOut(eqm) == eqm.flowOut)
+      @test(on(eqm) == eqm.on)
+      @test(start(eqm) == eqm.start)
+      @test(currentProduct(eqm) == eqm.currentProduct)
+      for em in [inm, oum]
+        @test_throws(MethodError, flowIn(em))
+        @test_throws(MethodError, flowOut(em))
+        @test_throws(MethodError, on(em))
+        @test_throws(MethodError, start(em))
+        @test_throws(ErrorException, currentProduct(em))
+      end
+
+      # Accessing variables (high level).
+      for em in [eqm, inm, oum]
+        @test(quantity(em, 1, 1) == em.quantity[1, 1])
+      end
+      @test(flowIn(eqm, 1, 1) == eqm.flowIn[1, 1])
+      @test(flowOut(eqm, 1, 1) == eqm.flowOut[1, 1])
+      @test(on(eqm, 1) == eqm.on[1])
+      @test(start(eqm, 1) == eqm.start[1])
+      @test_throws(ErrorException, currentProduct(eqm, 1, 1)) # Only one product.
+
+      @test_throws(ErrorException, flowIn(inm, 1, 1))
+      @test(flowIn(oum, 1, 1) == oum.quantity[1, 1])
+      @test(flowOut(inm, 1, 1) == inm.quantity[1, 1])
+      @test_throws(ErrorException, flowOut(oum, 1, 1))
+      for em in [inm, oum]
+        @test_throws(MethodError, on(em, 1))
+        @test_throws(MethodError, start(em, 1))
+        @test_throws(MethodError, currentProduct(em, 1, 1))
+      end
+
+      # Accessing variables (nice level).
+      @test_throws(ErrorException, checkDate(eqm, timeBeginning(eqm) - Hour(1), :test))
+      @test(checkDate(eqm, timeBeginning(eqm), :test))
+      @test(checkDate(eqm, timeEnding(eqm), :test))
+      @test_throws(ErrorException, checkDate(eqm, timeEnding(eqm) + Hour(1), :test))
+
+      @test(productId(eqm, p) == 1)
+
+      for em in [eqm, inm, oum]
+        @test(quantity(em, date, p) == em.quantity[1, 1])
+        @test(quantity(em, date + Hour(1), p) == em.quantity[2, 1])
+      end
+
+      @test(flowIn(eqm, date, p) == eqm.flowIn[1, 1])
+      @test(flowIn(eqm, date + Hour(1), p) == eqm.flowIn[2, 1])
+      @test(flowOut(eqm, date, p) == eqm.flowOut[1, 1])
+      @test(flowOut(eqm, date + Hour(1), p) == eqm.flowOut[2, 1])
+      @test_throws(ErrorException, flowIn(inm, date, p))
+      @test(flowIn(oum, date, p) == oum.quantity[1, 1])
+      @test(flowOut(inm, date, p) == inm.quantity[1, 1])
+      @test_throws(ErrorException, flowOut(oum, date, p))
+
+      @test(on(eqm, date) == eqm.on[1, 1])
+      @test(on(eqm, date + Hour(1)) == eqm.on[2, 1])
+      @test(start(eqm, date) == eqm.start[1, 1])
+      @test(start(eqm, date + Hour(1)) == eqm.start[2, 1])
+      @test_throws(ErrorException, currentProduct(eqm, date, p)) # Only one product.
+      @test_throws(ErrorException, currentProduct(eqm, date + Hour(1), p)) # Only one product.
+
+      @test(off(eqm, date) == 1 - eqm.on[1, 1])
+      @test(off(eqm, date + Hour(1)) == 1 - eqm.on[2, 1])
     end
 
     @testset "Consumption" begin # TODO: Really keep consumption separate? Maybe easier for maintenance (requires a new function each time a consumption model is added).

@@ -17,18 +17,18 @@ timing(hr::TimingModel) = hr.timing
 shiftOpen(hr::TimingModel, s::Int) = hr.shiftOpen[s]
 
 shiftOpen(hr::TimingModel, d::DateTime) = shiftOpen(hr, dateToShift(hr, d))
-timeStepOpen(hr::TimingModel, d::DateTime) = shiftOpen(hr, dateToShift(hr, d)) # TODO: Remove me!
+timeStepOpen(hr::TimingModel, d::DateTime) = shiftOpen(hr, dateToShift(hr, d))
 
 
 # Link to the methods of Timing.
 timeBeginning(hr::TimingModel) = timeBeginning(timing(hr))
 timeHorizon(hr::TimingModel) = timeHorizon(timing(hr))
-timeEnding(hr::TimingModel) = timeEnding(timing(hr)) # TODO: To test!
+timeEnding(hr::TimingModel) = timeEnding(timing(hr))
 timeStepDuration(hr::TimingModel) = timeStepDuration(timing(hr))
 shiftBeginning(hr::TimingModel) = shiftBeginning(timing(hr))
 shiftDuration(hr::TimingModel) = shiftDuration(timing(hr))
 
-nTimeSteps(hr::TimingModel, d::Period) = nTimeSteps(timing(hr), d) # TODO: Required here or not?
+nTimeSteps(hr::TimingModel, d::Period) = nTimeSteps(timing(hr), d)
 nTimeSteps(hr::TimingModel) = nTimeSteps(timing(hr))
 nTimeStepsPerShift(hr::TimingModel) = nTimeStepsPerShift(timing(hr))
 nShifts(hr::TimingModel) = nShifts(timing(hr))

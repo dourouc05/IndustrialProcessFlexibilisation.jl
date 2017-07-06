@@ -108,7 +108,7 @@ kind(eq::ImplicitEquipmentModel) = kind(equipment(eq))
 # Link to the methods of Timing.
 timeBeginning(eq::AbstractEquipmentModel) = timeBeginning(timing(eq))
 timeHorizon(eq::AbstractEquipmentModel) = timeHorizon(timing(eq))
-timeEnding(eq::AbstractEquipmentModel) = timeEnding(timing(eq)) # TODO: To test!
+timeEnding(eq::AbstractEquipmentModel) = timeEnding(timing(eq))
 timeStepDuration(eq::AbstractEquipmentModel) = timeStepDuration(timing(eq))
 
 nTimeSteps(eq::AbstractEquipmentModel, d::Period) = nTimeSteps(timing(eq), d) # TODO: Required here or not?
@@ -132,7 +132,7 @@ flowOut(eq::EquipmentModel) = eq.flowOut
 on(eq::EquipmentModel) = eq.on
 start(eq::EquipmentModel) = eq.start
 currentProduct(eq::EquipmentModel) = eq.currentProduct
-currentProduct(eq::ImplicitEquipmentModel) = error("Impicit equipments do not have a current product variable per say. Use the one of the downstream piece of equipment.")
+currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the downstream piece of equipment.")
 
 quantity(eq::EquipmentModel, ts::Int, nProduct::Int) = quantity(eq)[ts, nProduct]
 flowIn(eq::EquipmentModel, ts::Int, nProduct::Int) = flowIn(eq)[ts, nProduct]

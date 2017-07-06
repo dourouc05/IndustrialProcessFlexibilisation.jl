@@ -20,7 +20,6 @@
       # Change timing bounds to get rid of one order.
       t2 = Timing(timeBeginning=date, timeHorizon=Day(5), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(24))
       obm = convert(Array, ob, t2, shiftly=true, restrictToTiming=true)
-      println(obm)
       @test(size(obm, 1) == 5) # 5 days, 1-day shifts.
       @test(size(obm, 2) == 1) # Products.
       @test(sum(obm, 1) ≈ [50.]')

@@ -9,6 +9,7 @@
       @test(timing(hrm) == t)
       @test(timeBeginning(hrm) == timeBeginning(t))
       @test(timeHorizon(hrm) == timeHorizon(t))
+      @test(timeEnding(hrm) == timeEnding(t))
       @test(timeStepDuration(hrm) == timeStepDuration(t))
       @test(shiftBeginning(hrm) == shiftBeginning(t))
       @test(shiftDuration(hrm) == shiftDuration(t))
@@ -52,6 +53,100 @@
       @test(dateToShift(hrm, date - Hour(4) + Hour(7)) == 1)
       @test(dateToShift(hrm, date - Hour(4) + Hour(8)) == 2)
       @test(dateToShift(hrm, date - Hour(4) + Hour(12)) == 2)
+    end
+
+    @testset "Equipment" begin
+      date = DateTime(2017, 01, 01, 12, 32, 42)
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+      e = Equipment("EAF", :eaf)
+      c = ConstantConsumption(2.0)
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      eqm = EquipmentModel(m, e, t, ob)
+      inm = EquipmentModel(m, inEquipment, t, ob)
+      oum = EquipmentModel(m, outEquipment, t, ob)
+
+      # Linking to the right objects.
+      @test(equipment(eqm) == e)
+      @test(equipment(inm) == inEquipment)
+      @test(equipment(oum) == outEquipment)
+      for em in [eqm, inm, oum]
+        @test(timing(em) == t)
+        @test(orderBook(em) == ob)
+      end
+
+      # Linking to Equipment.
+      @test(name(eqm) == name(e))
+      @test(name(inm) == name(inEquipment))
+      @test(name(oum) == name(outEquipment))
+      @test(kind(eqm) == kind(e))
+      @test(kind(inm) == kind(inEquipment))
+      @test(kind(oum) == kind(outEquipment))
+      @test(transformationRate(eqm) == transformationRate(e))
+      @test_throws(MethodError, transformationRate(inm))
+      @test_throws(MethodError, transformationRate(oum))
+      @test(minimumUpTime(eqm) == minimumUpTime(e))
+      @test_throws(MethodError, minimumUpTime(inm))
+      @test_throws(MethodError, minimumUpTime(oum))
+      @test(minimumUpTime(eqm) == minimumUpTime(e))
+      @test_throws(MethodError, minimumUpTime(inm))
+      @test_throws(MethodError, minimumUpTime(oum))
+      @test(minimumProduction(eqm) == minimumProduction(e))
+      @test_throws(MethodError, minimumProduction(inm))
+      @test_throws(MethodError, minimumProduction(oum))
+      @test(maximumProduction(eqm) == maximumProduction(e))
+      @test_throws(MethodError, maximumProduction(inm))
+      @test_throws(MethodError, maximumProduction(oum))
+      @test(processTime(eqm) == processTime(e))
+      @test_throws(MethodError, processTime(inm))
+      @test_throws(MethodError, processTime(oum))
+
+      for em in [eqm, inm, oum]
+        # Linking to Timing.
+        @test(timeBeginning(em) == timeBeginning(t))
+        @test(timeHorizon(em) == timeHorizon(t))
+        @test(timeEnding(em) == timeEnding(t))
+        @test(timeStepDuration(em) == timeStepDuration(t))
+        @test(nTimeSteps(em, Minute(15)) == nTimeSteps(t, Minute(15)))
+        @test(nTimeSteps(em, Day(1)) == nTimeSteps(t, Day(1)))
+        @test(nTimeSteps(em) == nTimeSteps(t))
+        @test(dateToTimeStep(em, date) == dateToTimeStep(t, date))
+        @test(dateToTimeStep(em, date + Hour(5)) == dateToTimeStep(t, date + Hour(5)))
+        @test(dateToTimeStep(em, date + Hour(7)) == dateToTimeStep(t, date + Hour(7)))
+        @test(dateToTimeStep(em, date + Hour(8)) == dateToTimeStep(t, date + Hour(8)))
+        @test(dateToTimeStep(em, date + Hour(12)) == dateToTimeStep(t, date + Hour(12)))
+        @test(eachTimeStep(em) == eachTimeStep(t))
+        @test(collect(eachTimeStep(em)) == collect(eachTimeStep(t)))
+
+        # Linking to OrderBook.
+        @test(products(em) == products(ob))
+        @test(nProducts(em) == nProducts(ob))
+        @test(productIds(em) == productIds(ob))
+      end
+
+      # Linking to Product.
+      @test(maxBatchSize(p, eqm) == maxBatchSize(p, e))
+      @test_throws(MethodError, maxBatchSize(p, inm))
+      @test_throws(MethodError, maxBatchSize(p, oum))
+      @test(minBatchSize(p, eqm) == minBatchSize(p, e))
+      @test_throws(MethodError, minBatchSize(p, inm))
+      @test_throws(MethodError, minBatchSize(p, oum))
+    end
+
+    @testset "Consumption" begin # TODO: Really keep consumption separate? Maybe easier for maintenance (requires a new function each time a consumption model is added).
+      date = DateTime(2017, 01, 01, 12, 32, 42)
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+      e = Equipment("EAF", :eaf)
+      c = ConstantConsumption(2.0)
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      eqm = EquipmentModel(m, e, t, ob)
     end
 
     @testset "Plant" begin

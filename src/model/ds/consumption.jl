@@ -1,3 +1,8 @@
+"""
+Returns a JuMP expression for the consumption of the piece of equipment when it has to produce `p` at time `d`.
+This expression is likely to involve optimisation variables, mostly indicating whether the process is on or the
+quantity it has to process. 
+"""
 consumption(eq::EquipmentModel, p::Product, d::DateTime) = consumption(eq, p, consumption(p, equipment(eq)), d) # TODO: To test!
 
 # These functions are just for overloading over the third parameter, and get dispatch on it.

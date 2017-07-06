@@ -59,6 +59,7 @@ module IndustrialProcessFlexibilisation
 
   import Base: start, next, done, eltype, length, copy, find, ==, hash, writecsv, replace, convert
   import Base.Random: rand
+  import TimeSeries: from, to
 
   include("data/data.jl")
   include("model/model.jl")

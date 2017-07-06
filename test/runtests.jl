@@ -1,6 +1,6 @@
 using Base.Test
 using Base.Dates
-import TimeSeries: TimeArray, timestamp, colnames, values # Avoid name clashing on from
+using TimeSeries
 using JuMP
 using Cbc
 using IndustrialProcessFlexibilisation

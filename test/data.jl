@@ -440,97 +440,117 @@
   end
 
   @testset "Order book" begin
-    # No need for merging: both ways should give the same results for dueBy.
-    c = ConstantConsumption(2.0)
-    e = Equipment("EAF", :eaf)
-    p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-    p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-    ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50)))
+    @testset "Simple case: one order per product" begin
+      # No need for merging: both ways should give the same results for dueBy.
+      c = ConstantConsumption(2.0)
+      e = Equipment("EAF", :eaf)
+      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50)))
 
-    @test(orderBook(ob) == collect(Dict(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50))))
-    @test(dates(ob) == [DateTime(2010), DateTime(2011)])
-    @test(all((r) -> in(r, products(ob)), [p1, p2]))
-    @test(all((r) -> in(r, [p1, p2]), products(ob)))
-    @test(nProducts(ob) == length([p1, p2]))
-    @test(nProducts(ob) == 2)
+      @test(orderBook(ob) == collect(Dict(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50))))
+      @test(dates(ob) == [DateTime(2010), DateTime(2011)])
+      @test(all((r) -> in(r, products(ob)), [p1, p2]))
+      @test(all((r) -> in(r, [p1, p2]), products(ob)))
+      @test(nProducts(ob) == length([p1, p2]))
+      @test(nProducts(ob) == 2)
 
-    @test(length(productIds(ob)) == 2)
-    @test(all((r) -> in(r, collect(keys(productIds(ob)))), [p1, p2]))
-    @test(all((r) -> in(r, [p1, p2]), collect(keys(productIds(ob)))))
-    @test(length(keys(productIds(ob))) == length([p1, p2]))
-    @test(length(unique(collect(values(productIds(ob))))) == length([p1, p2]))
-    @test(sort(collect(values(productIds(ob)))) == sort(unique(collect(values(productIds(ob))))))
-    @test(sort([productId(ob, p) for p in products(ob)]) == sort(unique([productId(ob, p) for p in products(ob)])))
-    @test(all((r) -> in(r, [productFromId(ob, pid) for pid in 1:nProducts(ob)]), [p1, p2]))
-    @test(all((r) -> in(r, [p1, p2]), [productFromId(ob, pid) for pid in 1:nProducts(ob)]))
-    @test(all(Bool[p == productFromId(ob, productId(ob, p)) for p in products(ob)]))
+      @test(length(productIds(ob)) == 2)
+      @test(all((r) -> in(r, collect(keys(productIds(ob)))), [p1, p2]))
+      @test(all((r) -> in(r, [p1, p2]), collect(keys(productIds(ob)))))
+      @test(length(keys(productIds(ob))) == length([p1, p2]))
+      @test(length(unique(collect(values(productIds(ob))))) == length([p1, p2]))
+      @test(sort(collect(values(productIds(ob)))) == sort(unique(collect(values(productIds(ob))))))
+      @test(sort([productId(ob, p) for p in products(ob)]) == sort(unique([productId(ob, p) for p in products(ob)])))
+      @test(all((r) -> in(r, [productFromId(ob, pid) for pid in 1:nProducts(ob)]), [p1, p2]))
+      @test(all((r) -> in(r, [p1, p2]), [productFromId(ob, pid) for pid in 1:nProducts(ob)]))
+      @test(all(Bool[p == productFromId(ob, productId(ob, p)) for p in products(ob)]))
 
-    @test(nOrders(ob) == 2)
-    @test(earliest(ob) == DateTime(2010))
-    @test(latest(ob) == DateTime(2011))
+      @test(nOrders(ob) == 2)
+      @test(earliest(ob) == DateTime(2010))
+      @test(latest(ob) == DateTime(2011))
 
-    @test(dueBy(ob, DateTime(2009)) == Dict{Product, Float64}())
-    @test(dueBy(ob, DateTime(2010)) == Dict(p1 => 50))
-    @test(dueBy(ob, DateTime(2011)) == Dict(p1 => 50, p2 => 50))
-    @test(dueBy(ob, DateTime(2012)) == dueBy(ob, DateTime(2011)))
+      @test(dueBy(ob, DateTime(2009)) == Dict{Product, Float64}())
+      @test(dueBy(ob, DateTime(2010)) == Dict(p1 => 50))
+      @test(dueBy(ob, DateTime(2011)) == Dict(p1 => 50, p2 => 50))
+      @test(dueBy(ob, DateTime(2012)) == dueBy(ob, DateTime(2011)))
 
-    @test(dueBy(ob, DateTime(2009)) == dueBy(ob, DateTime(2009), cumulative=true))
-    @test(dueBy(ob, DateTime(2010)) == dueBy(ob, DateTime(2010), cumulative=true))
-    @test(dueBy(ob, DateTime(2011)) == dueBy(ob, DateTime(2011), cumulative=true))
-    @test(dueBy(ob, DateTime(2012)) == dueBy(ob, DateTime(2012), cumulative=true))
+      @test(dueBy(ob, DateTime(2009)) == dueBy(ob, DateTime(2009), cumulative=true))
+      @test(dueBy(ob, DateTime(2010)) == dueBy(ob, DateTime(2010), cumulative=true))
+      @test(dueBy(ob, DateTime(2011)) == dueBy(ob, DateTime(2011), cumulative=true))
+      @test(dueBy(ob, DateTime(2012)) == dueBy(ob, DateTime(2012), cumulative=true))
 
-    @test(dueBy(ob, DateTime(2009), cumulative=false) == [])
-    @test(dueBy(ob, DateTime(2010), cumulative=false) == [(p1, 50)])
-    @test(dueBy(ob, DateTime(2011), cumulative=false) == [(p1, 50), (p2, 50)])
-    @test(dueBy(ob, DateTime(2012), cumulative=false) == dueBy(ob, DateTime(2011), cumulative=false))
+      @test(dueBy(ob, DateTime(2009), cumulative=false) == [])
+      @test(dueBy(ob, DateTime(2010), cumulative=false) == [(p1, 50)])
+      @test(dueBy(ob, DateTime(2011), cumulative=false) == [(p1, 50), (p2, 50)])
+      @test(dueBy(ob, DateTime(2012), cumulative=false) == dueBy(ob, DateTime(2011), cumulative=false))
 
-    @test(dueBy(fromto(ob, DateTime(2010), DateTime(2011)), DateTime(2012)) == Dict(p1 => 50, p2 => 50))
-    @test(dueBy(fromto(ob, DateTime(2009), DateTime(2010)), DateTime(2012)) == Dict(p1 => 50))
-    @test(dueBy(fromto(ob, DateTime(2011), DateTime(2012)), DateTime(2012)) == Dict(p2 => 50))
-    @test(dueBy(fromto(ob, DateTime(2008), DateTime(2009)), DateTime(2012)) == Dict{Product, Float64}())
+      @test(dueBy(fromto(ob, DateTime(2010), DateTime(2011)), DateTime(2012)) == Dict(p1 => 50, p2 => 50))
+      @test(dueBy(fromto(ob, DateTime(2009), DateTime(2010)), DateTime(2012)) == Dict(p1 => 50))
+      @test(dueBy(fromto(ob, DateTime(2011), DateTime(2012)), DateTime(2012)) == Dict(p2 => 50))
+      @test(dueBy(fromto(ob, DateTime(2008), DateTime(2009)), DateTime(2012)) == Dict{Product, Float64}())
+    end
 
-    # A product is ordered multiple times.
-    c = ConstantConsumption(2.0)
-    e = Equipment("EAF", :eaf)
-    p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-    p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-    lp = [p1, p2]
-    ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50), DateTime(2012) => (p1, 100)))
+    @testset "More complex case: multiple orders per product" begin
+      # A product is ordered multiple times.
+      c = ConstantConsumption(2.0)
+      e = Equipment("EAF", :eaf)
+      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      lp = [p1, p2]
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50), DateTime(2012) => (p1, 100)))
 
-    @test(orderBook(ob) == collect(Dict(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50), DateTime(2012) => (p1, 100))))
-    @test(dates(ob) == [DateTime(2010), DateTime(2011), DateTime(2012)])
+      @test(orderBook(ob) == collect(Dict(DateTime(2010) => (p1, 50), DateTime(2011) => (p2, 50), DateTime(2012) => (p1, 100))))
+      @test(dates(ob) == [DateTime(2010), DateTime(2011), DateTime(2012)])
 
-    @test(all((r) -> in(r, products(ob)), lp))
-    @test(all((r) -> in(r, lp), products(ob)))
-    @test(nProducts(ob) == length(lp))
-    @test(nProducts(ob) == length(products(ob)))
+      @test(all((r) -> in(r, products(ob)), lp))
+      @test(all((r) -> in(r, lp), products(ob)))
+      @test(nProducts(ob) == length(lp))
+      @test(nProducts(ob) == length(products(ob)))
 
-    @test(nOrders(ob) == 3)
-    @test(earliest(ob) == DateTime(2010))
-    @test(latest(ob) == DateTime(2012))
+      @test(nOrders(ob) == 3)
+      @test(earliest(ob) == DateTime(2010))
+      @test(latest(ob) == DateTime(2012))
 
-    @test(dueBy(ob, DateTime(2009)) == Dict{Product, Float64}())
-    @test(dueBy(ob, DateTime(2010)) == Dict(p1 => 50))
-    @test(dueBy(ob, DateTime(2011)) == Dict(p1 => 50, p2 => 50))
-    @test(dueBy(ob, DateTime(2012)) == Dict(p1 => 150, p2 => 50))
-    @test(dueBy(ob, DateTime(2013)) == dueBy(ob, DateTime(2012)))
+      @test(dueBy(ob, DateTime(2009)) == Dict{Product, Float64}())
+      @test(dueBy(ob, DateTime(2010)) == Dict(p1 => 50))
+      @test(dueBy(ob, DateTime(2011)) == Dict(p1 => 50, p2 => 50))
+      @test(dueBy(ob, DateTime(2012)) == Dict(p1 => 150, p2 => 50))
+      @test(dueBy(ob, DateTime(2013)) == dueBy(ob, DateTime(2012)))
 
-    @test(dueBy(ob, DateTime(2009)) == dueBy(ob, DateTime(2009), cumulative=true))
-    @test(dueBy(ob, DateTime(2010)) == dueBy(ob, DateTime(2010), cumulative=true))
-    @test(dueBy(ob, DateTime(2011)) == dueBy(ob, DateTime(2011), cumulative=true))
-    @test(dueBy(ob, DateTime(2012)) == dueBy(ob, DateTime(2012), cumulative=true))
-    @test(dueBy(ob, DateTime(2013)) == dueBy(ob, DateTime(2013), cumulative=true))
+      @test(dueBy(ob, DateTime(2009)) == dueBy(ob, DateTime(2009), cumulative=true))
+      @test(dueBy(ob, DateTime(2010)) == dueBy(ob, DateTime(2010), cumulative=true))
+      @test(dueBy(ob, DateTime(2011)) == dueBy(ob, DateTime(2011), cumulative=true))
+      @test(dueBy(ob, DateTime(2012)) == dueBy(ob, DateTime(2012), cumulative=true))
+      @test(dueBy(ob, DateTime(2013)) == dueBy(ob, DateTime(2013), cumulative=true))
 
-    @test(dueBy(ob, DateTime(2009), cumulative=false) == [])
-    @test(dueBy(ob, DateTime(2010), cumulative=false) == [(p1, 50)])
-    @test(dueBy(ob, DateTime(2011), cumulative=false) == [(p1, 50), (p2, 50)])
-    @test(dueBy(ob, DateTime(2012), cumulative=false) == [(p1, 50), (p2, 50), (p1, 100)])
-    @test(dueBy(ob, DateTime(2013), cumulative=false) == dueBy(ob, DateTime(2012), cumulative=false))
+      @test(dueBy(ob, DateTime(2009), cumulative=false) == [])
+      @test(dueBy(ob, DateTime(2010), cumulative=false) == [(p1, 50)])
+      @test(dueBy(ob, DateTime(2011), cumulative=false) == [(p1, 50), (p2, 50)])
+      @test(dueBy(ob, DateTime(2012), cumulative=false) == [(p1, 50), (p2, 50), (p1, 100)])
+      @test(dueBy(ob, DateTime(2013), cumulative=false) == dueBy(ob, DateTime(2012), cumulative=false))
 
-    @test(dueBy(fromto(ob, DateTime(2010), DateTime(2011)), DateTime(2012)) == Dict(p1 => 50, p2 => 50))
-    @test(dueBy(fromto(ob, DateTime(2009), DateTime(2010)), DateTime(2012)) == Dict(p1 => 50))
-    @test(dueBy(fromto(ob, DateTime(2011), DateTime(2012)), DateTime(2012)) == Dict(p1 => 100, p2 => 50))
-    @test(dueBy(fromto(ob, DateTime(2008), DateTime(2009)), DateTime(2012)) == Dict{Product, Float64}())
+      @test(dueBy(fromto(ob, DateTime(2010), DateTime(2011)), DateTime(2012)) == Dict(p1 => 50, p2 => 50))
+      @test(dueBy(fromto(ob, DateTime(2009), DateTime(2010)), DateTime(2012)) == Dict(p1 => 50))
+      @test(dueBy(fromto(ob, DateTime(2011), DateTime(2012)), DateTime(2012)) == Dict(p1 => 100, p2 => 50))
+      @test(dueBy(fromto(ob, DateTime(2008), DateTime(2009)), DateTime(2012)) == Dict{Product, Float64}())
+    end
+
+    @testset "Random generation" begin
+      c = ConstantConsumption(2.0)
+      e = Equipment("EAF", :eaf)
+      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+
+      dateList = map(DateTime, 2010:2015)
+      dateAvg = 50.
+
+      srand(0)
+      ob = rand(OrderBook, dateList, dateAvg, p1)
+
+      @test(dates(ob) == dateList)
+      @test(length(products(ob)) == 1)
+      @test(products(ob)[1] == p1)
+    end
   end
 
   @testset "Timing" begin

@@ -93,7 +93,9 @@ To count worked shifts for only specific days, use the keyword argument `days` a
 corresponding to the days to count (1 for Monday, just like `shiftsAsLetters`). For ease, you can also use `weekend`
 to select the weekend (Saturday and Sunday); this option cannot be used at the same time as `days`.
 """
-function countShifts(solution::Array{Char, 2}, shift::Char; weekend::Bool=false, days::Array{Int, 1}=Int[]) # TODO: To test! shift = M, A, N, R, w (w == M + A + N). weekend. days ([6, 7] == weekend).
+function countShifts(solution::Array{Char, 2}, shift::Char; weekend::Bool=false, days::Array{Int, 1}=Int[])
+  # TODO: To test! shift = M, A, N, R, w (w == M + A + N). weekend. days ([6, 7] == weekend).
+  # TODO: To test specifically: week ends seem to be wrong for now (or used to). 
   nTeams = size(solution, 1)
   nDays = size(solution, 2)
 

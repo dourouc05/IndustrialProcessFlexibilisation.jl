@@ -165,8 +165,8 @@ on(eq::EquipmentModel, d::DateTime) = checkDate(eq, d, :on) && on(eq, dateToTime
 start(eq::EquipmentModel, d::DateTime) = checkDate(eq, d, :start) && start(eq, dateToTimeStep(eq, d)) # Undefined for ImplicitEquipmentModel.
 currentProduct(eq::EquipmentModel, d::DateTime, p::Product) = currentProduct(eq, dateToTimeStep(eq, d), productId(eq, p))
 
-off(eq::EquipmentModel, d::DateTime) = 1 - on(eq, d) # Undefined for ImplicitEquipmentModel.
-stop(eq::EquipmentModel, d::DateTime) = if d - processTime(eq) >= timeBeginning(eq); start(eq, d - processTime(eq)); else 0; end # Undefined for ImplicitEquipmentModel. TODO: What happens before optimisation horizon?
+off(eq::EquipmentModel, d::DateTime) = checkDate(eq, d, :off) && 1 - on(eq, d) # Undefined for ImplicitEquipmentModel.
+stop(eq::EquipmentModel, d::DateTime) = checkDate(eq, d - processTime(eq), :stop) && start(eq, d - processTime(eq)) # Undefined for ImplicitEquipmentModel. TODO: What happens before optimisation horizon? Should read from the initial conditions. For now, just thrown an error.
 
 
 # Define the constraints.
@@ -286,11 +286,15 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel) # TODO:
     end
 
     # A batch equipment can only have outputs when it is done.
-    if maxFlowIn != minFlowIn
-      @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
-      @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= transformationRate(eq) * minFlowIn * stop(eq, d))
+    if d - processTime(eq) < timeBeginning(eq)
+      @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == 0.)
     else
-      @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
+      if maxFlowIn != minFlowIn
+        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
+        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= transformationRate(eq) * minFlowIn * stop(eq, d))
+      else
+        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
+      end
     end
   end
 end

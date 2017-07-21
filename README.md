@@ -10,6 +10,6 @@ To install:
     
     Pkg.clone("https://github.com/dourouc05/IndustrialProcessFlexibilisation.jl")
 
-Some results have been presented at the [COMEX workshop](http://orbi.ulg.ac.be/handle/2268/207330); the tool will also be the topic of a talk at [IFORS 2017](http://ifors2017.ca/) (session HB-29). 
+Some results have been presented at the [COMEX workshop](http://orbi.ulg.ac.be/handle/2268/207330) and at the [IFORS 2017 conference](http://orbi.ulg.ac.be/handle/2268/207330). 
 
 This package has been developed in the context of the [InduStore project](http://www.industore-project.be/). 

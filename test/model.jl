@@ -368,8 +368,8 @@
         @test(start(eqm, date + Hour(1)) == eqm.start[2])
         @test(currentProduct(eqm, date, p1) == eqm.currentProduct[1, productId(eqm, p1)])
         @test(currentProduct(eqm, date + Hour(1), p1) == eqm.currentProduct[2, productId(eqm, p1)])
-        @test(currentProduct(eqm, date, p2) == eqm.currentProduct[1, productId(eqm, p2)]) 
-        @test(currentProduct(eqm, date + Hour(1), p2) == eqm.currentProduct[2, productId(eqm, p2)]) 
+        @test(currentProduct(eqm, date, p2) == eqm.currentProduct[1, productId(eqm, p2)])
+        @test(currentProduct(eqm, date + Hour(1), p2) == eqm.currentProduct[2, productId(eqm, p2)])
 
         @test(off(eqm, date) == 1 - eqm.on[1])
         @test(off(eqm, date + Hour(1)) == 1 - eqm.on[2])
@@ -381,14 +381,62 @@
     @testset "Consumption" begin # TODO: Really keep consumption separate? Maybe easier for maintenance (requires a new function each time a consumption model is added).
       date = DateTime(2017, 01, 01, 12, 32, 42)
       t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
-
       e = Equipment("EAF", :eaf)
+
+      # No consumption
+      c = NoConsumption()
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      eqm = EquipmentModel(m, e, t, ob)
+
+      @test(consumption(eqm, p, date + Day(2)) == 0.0)
+      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+
+      # Constant consumption
       c = ConstantConsumption(2.0)
       p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
       ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
       m = Model(solver=CbcSolver(logLevel=0))
       eqm = EquipmentModel(m, e, t, ob)
+
+      @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)))
+      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+
+      # Constant consumption
+      c = LinearConsumption(2.0, 4.0)
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      eqm = EquipmentModel(m, e, t, ob)
+
+      @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)) + 4 * quantity(eqm, date + Day(2), p))
+      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+
+      # Quadratic consumption
+      c = QuadraticConsumption(2.0, 4.0, 8.0)
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      eqm = EquipmentModel(m, e, t, ob)
+
+      @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)) + 4 * quantity(eqm, date + Day(2), p) + 8 * quantity(eqm, date + Day(2), p) ^ 2)
+      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+
+      # Piecewise linear consumption
+      c = PiecewiseLinearConsumption([1.0, 2.0], [4.0, 8.0])
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      eqm = EquipmentModel(m, e, t, ob)
+
+      @test_broken(consumption(eqm, p, date + Day(2)) == 0.0)
+      @test_broken(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
     end
 
     @testset "Plant" begin

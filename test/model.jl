@@ -376,67 +376,247 @@
         @test(stop(eqm, date + Hour(1)) == eqm.on[1])
         @test_throws(ErrorException, stop(eqm, date))
       end
+
+      @testset "One product, multiple time steps" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15), shiftBeginning=date, shiftDuration=Hour(8))
+
+        e = Equipment("EAF", :eaf) # One-hour duration
+        c = ConstantConsumption(2.0)
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        eqm = EquipmentModel(m, e, t, ob)
+        inm = EquipmentModel(m, inEquipment, t, ob)
+        oum = EquipmentModel(m, outEquipment, t, ob)
+
+        # Linking to the right objects.
+        @test(equipment(eqm) == e)
+        @test(equipment(inm) == inEquipment)
+        @test(equipment(oum) == outEquipment)
+        for em in [eqm, inm, oum]
+          @test(timing(em) == t)
+          @test(orderBook(em) == ob)
+        end
+
+        # Linking to Equipment.
+        @test(name(eqm) == name(e))
+        @test(name(inm) == name(inEquipment))
+        @test(name(oum) == name(outEquipment))
+        @test(kind(eqm) == kind(e))
+        @test(kind(inm) == kind(inEquipment))
+        @test(kind(oum) == kind(outEquipment))
+        @test(transformationRate(eqm) == transformationRate(e))
+        @test_throws(MethodError, transformationRate(inm))
+        @test_throws(MethodError, transformationRate(oum))
+        @test(minimumUpTime(eqm) == minimumUpTime(e))
+        @test_throws(MethodError, minimumUpTime(inm))
+        @test_throws(MethodError, minimumUpTime(oum))
+        @test(minimumUpTime(eqm) == minimumUpTime(e))
+        @test_throws(MethodError, minimumUpTime(inm))
+        @test_throws(MethodError, minimumUpTime(oum))
+        @test(minimumProduction(eqm) == minimumProduction(e))
+        @test_throws(MethodError, minimumProduction(inm))
+        @test_throws(MethodError, minimumProduction(oum))
+        @test(maximumProduction(eqm) == maximumProduction(e))
+        @test_throws(MethodError, maximumProduction(inm))
+        @test_throws(MethodError, maximumProduction(oum))
+        @test(processTime(eqm) == processTime(e))
+        @test_throws(MethodError, processTime(inm))
+        @test_throws(MethodError, processTime(oum))
+
+        for em in [eqm, inm, oum]
+          # Linking to Timing.
+          @test(timeBeginning(em) == timeBeginning(t))
+          @test(timeHorizon(em) == timeHorizon(t))
+          @test(timeEnding(em) == timeEnding(t))
+          @test(timeStepDuration(em) == timeStepDuration(t))
+          @test(nTimeSteps(em, Minute(15)) == nTimeSteps(t, Minute(15)))
+          @test(nTimeSteps(em, Day(1)) == nTimeSteps(t, Day(1)))
+          @test(nTimeSteps(em) == nTimeSteps(t))
+          @test(dateToTimeStep(em, date) == dateToTimeStep(t, date))
+          @test(dateToTimeStep(em, date + Hour(5)) == dateToTimeStep(t, date + Hour(5)))
+          @test(dateToTimeStep(em, date + Hour(7)) == dateToTimeStep(t, date + Hour(7)))
+          @test(dateToTimeStep(em, date + Hour(8)) == dateToTimeStep(t, date + Hour(8)))
+          @test(dateToTimeStep(em, date + Hour(12)) == dateToTimeStep(t, date + Hour(12)))
+          @test(eachTimeStep(em) == eachTimeStep(t))
+          @test(collect(eachTimeStep(em)) == collect(eachTimeStep(t)))
+
+          # Linking to OrderBook.
+          @test(products(em) == products(ob))
+          @test(nProducts(em) == nProducts(ob))
+          @test(productIds(em) == productIds(ob))
+        end
+
+        # Linking to Product.
+        @test(maxBatchSize(p, eqm) == maxBatchSize(p, e))
+        @test_throws(MethodError, maxBatchSize(p, inm))
+        @test_throws(MethodError, maxBatchSize(p, oum))
+        @test(minBatchSize(p, eqm) == minBatchSize(p, e))
+        @test_throws(MethodError, minBatchSize(p, inm))
+        @test_throws(MethodError, minBatchSize(p, oum))
+
+        # Accessing variables (low level).
+        for em in [eqm, inm, oum]
+          @test(quantity(em) == em.quantity)
+        end
+        @test(flowIn(eqm) == eqm.flowIn)
+        @test(flowOut(eqm) == eqm.flowOut)
+        @test(on(eqm) == eqm.on)
+        @test(start(eqm) == eqm.start)
+        @test(currentProduct(eqm) == eqm.currentProduct)
+        for em in [inm, oum]
+          @test_throws(MethodError, flowIn(em))
+          @test_throws(MethodError, flowOut(em))
+          @test_throws(MethodError, on(em))
+          @test_throws(MethodError, start(em))
+          @test_throws(ErrorException, currentProduct(em))
+        end
+
+        # Accessing variables (high level).
+        for em in [eqm, inm, oum]
+          @test(quantity(em, 1, 1) == em.quantity[1, 1])
+        end
+        @test(flowIn(eqm, 1, 1) == eqm.flowIn[1, 1])
+        @test(flowOut(eqm, 1, 1) == eqm.flowOut[1, 1])
+        @test(on(eqm, 1) == eqm.on[1])
+        @test(start(eqm, 1) == eqm.start[1])
+        @test_throws(ErrorException, currentProduct(eqm, 1, 1)) # Only one product.
+
+        @test_throws(ErrorException, flowIn(inm, 1, 1))
+        @test(flowIn(oum, 1, 1) == oum.quantity[1, 1])
+        @test(flowOut(inm, 1, 1) == inm.quantity[1, 1])
+        @test_throws(ErrorException, flowOut(oum, 1, 1))
+        for em in [inm, oum]
+          @test_throws(MethodError, on(em, 1))
+          @test_throws(MethodError, start(em, 1))
+          @test_throws(MethodError, currentProduct(em, 1, 1))
+        end
+
+        # Accessing variables (nice level).
+        @test_throws(ErrorException, checkDate(eqm, timeBeginning(eqm) - Hour(1), :test))
+        @test(checkDate(eqm, timeBeginning(eqm), :test))
+        @test(checkDate(eqm, timeEnding(eqm), :test))
+        @test_throws(ErrorException, checkDate(eqm, timeEnding(eqm) + Hour(1), :test))
+
+        @test(productId(eqm, p) == 1)
+
+        for em in [eqm, inm, oum]
+          @test(quantity(em, date, p) == em.quantity[1, 1])
+          @test(quantity(em, date + Minute(15), p) == em.quantity[2, 1])
+          @test(quantity(em, date + Hour(1), p) == em.quantity[5, 1])
+        end
+
+        @test(flowIn(eqm, date, p) == eqm.flowIn[1, 1])
+        @test(flowIn(eqm, date + Minute(15), p) == eqm.flowIn[2, 1])
+        @test(flowIn(eqm, date + Hour(1), p) == eqm.flowIn[5, 1])
+        @test(flowOut(eqm, date, p) == eqm.flowOut[1, 1])
+        @test(flowOut(eqm, date + Minute(15), p) == eqm.flowOut[2, 1])
+        @test(flowOut(eqm, date + Hour(1), p) == eqm.flowOut[5, 1])
+        @test_throws(ErrorException, flowIn(inm, date, p))
+        @test(flowIn(oum, date, p) == oum.quantity[1, 1])
+        @test(flowOut(inm, date, p) == inm.quantity[1, 1])
+        @test_throws(ErrorException, flowOut(oum, date, p))
+
+        @test(on(eqm, date) == eqm.on[1, 1])
+        @test(on(eqm, date + Minute(15)) == eqm.on[2, 1])
+        @test(on(eqm, date + Hour(1)) == eqm.on[5, 1])
+        @test(start(eqm, date) == eqm.start[1, 1])
+        @test(start(eqm, date + Minute(15)) == eqm.start[2, 1])
+        @test(start(eqm, date + Hour(1)) == eqm.start[5, 1])
+        @test_throws(ErrorException, currentProduct(eqm, date, p)) # Only one product.
+        @test_throws(ErrorException, currentProduct(eqm, date + Hour(1), p)) # Only one product.
+
+        @test(off(eqm, date) == 1 - eqm.on[1, 1])
+        @test(off(eqm, date + Minute(15)) == 1 - eqm.on[2, 1])
+        @test(off(eqm, date + Hour(1)) == 1 - eqm.on[5, 1])
+        @test_throws(ErrorException, stop(eqm, date))
+        @test_throws(ErrorException, stop(eqm, date + Minute(15)))
+        @test(stop(eqm, date + Hour(1)) == eqm.start[1, 1])
+      end
     end
 
-    @testset "Consumption" begin # TODO: Really keep consumption separate? Maybe easier for maintenance (requires a new function each time a consumption model is added).
-      date = DateTime(2017, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
-      e = Equipment("EAF", :eaf)
+    @testset "Consumption" begin
+      @testset "No consumption" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        e = Equipment("EAF", :eaf)
 
-      # No consumption
-      c = NoConsumption()
-      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+        c = NoConsumption()
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      eqm = EquipmentModel(m, e, t, ob)
+        m = Model(solver=CbcSolver(logLevel=0))
+        eqm = EquipmentModel(m, e, t, ob)
 
-      @test(consumption(eqm, p, date + Day(2)) == 0.0)
-      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+        @test(consumption(eqm, p, date + Day(2)) == 0.0)
+        @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+      end
 
-      # Constant consumption
-      c = ConstantConsumption(2.0)
-      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+      @testset "Constant consumption" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        e = Equipment("EAF", :eaf)
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      eqm = EquipmentModel(m, e, t, ob)
+        c = ConstantConsumption(2.0)
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
-      @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)))
-      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+        m = Model(solver=CbcSolver(logLevel=0))
+        eqm = EquipmentModel(m, e, t, ob)
 
-      # Constant consumption
-      c = LinearConsumption(2.0, 4.0)
-      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+        @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)))
+        @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+      end
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      eqm = EquipmentModel(m, e, t, ob)
+      @testset "Linear consumption" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        e = Equipment("EAF", :eaf)
 
-      @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)) + 4 * quantity(eqm, date + Day(2), p))
-      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+        c = LinearConsumption(2.0, 4.0)
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
-      # Quadratic consumption
-      c = QuadraticConsumption(2.0, 4.0, 8.0)
-      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+        m = Model(solver=CbcSolver(logLevel=0))
+        eqm = EquipmentModel(m, e, t, ob)
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      eqm = EquipmentModel(m, e, t, ob)
+        @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)) + 4 * quantity(eqm, date + Day(2), p))
+        @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+      end
 
-      @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)) + 4 * quantity(eqm, date + Day(2), p) + 8 * quantity(eqm, date + Day(2), p) ^ 2)
-      @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+      @testset "Quadratic consumption" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        e = Equipment("EAF", :eaf)
 
-      # Piecewise linear consumption
-      c = PiecewiseLinearConsumption([1.0, 2.0], [4.0, 8.0])
-      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
-      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+        c = QuadraticConsumption(2.0, 4.0, 8.0)
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      eqm = EquipmentModel(m, e, t, ob)
+        m = Model(solver=CbcSolver(logLevel=0))
+        eqm = EquipmentModel(m, e, t, ob)
 
-      @test_broken(consumption(eqm, p, date + Day(2)) == 0.0)
-      @test_broken(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+        @test(consumption(eqm, p, date + Day(2)) == 2 * on(eqm, date + Day(2)) + 4 * quantity(eqm, date + Day(2), p) + 8 * quantity(eqm, date + Day(2), p) ^ 2)
+        @test(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+      end
+
+      @testset "Piecewise linear consumption" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        e = Equipment("EAF", :eaf)
+
+        c = PiecewiseLinearConsumption([1.0, 2.0], [4.0, 8.0])
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        eqm = EquipmentModel(m, e, t, ob)
+
+        @test_broken(consumption(eqm, p, date + Day(2)) == 0.0)
+        @test_broken(consumption(eqm, p, date + Day(2)) == consumption(eqm, p, consumption(p, e), date + Day(2)))
+      end
     end
 
     @testset "Plant" begin

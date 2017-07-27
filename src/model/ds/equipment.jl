@@ -48,8 +48,10 @@ struct EquipmentModel <: AbstractEquipmentModel
       setname(on[t], "equipment_on_$(name(eq))_$(t)")
 
       if nTimeSteps(timing, processTime(eq)) > 1
-        setname(start[t],    "equipment_start_$(name(eq))_$(p)")
-        setname(quantity[t], "equipment_quantity_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+        setname(start[t], "equipment_start_$(name(eq))_$(t)")
+        for p in 1:nProducts(ob)
+          setname(quantity[t, p], "equipment_quantity_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+        end
       end
 
       for p in 1:nProducts(ob)

@@ -782,6 +782,98 @@
       end
     end
 
+    @testset "Order book" begin
+      date = DateTime(2010, 01, 01, 12, 32, 42)
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+      e = Equipment("EAF", :eaf)
+      c = ConstantConsumption(2.0)
+      p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      obm = OrderBookModel(m, ob, t)
+
+      # Basic accessors.
+      @test orderBook(obm) == ob
+      @test timing(obm) == t
+
+      # Link to the methods of Timing.
+      @test timeBeginning(obm) == timeBeginning(t)
+      @test timeHorizon(obm) == timeHorizon(t)
+      @test timeEnding(obm) == timeEnding(t)
+      @test timeStepDuration(obm) == timeStepDuration(t)
+
+      @test nTimeSteps(obm, Minute(15)) == nTimeSteps(t, Minute(15))
+      @test nTimeSteps(obm, Hour(1)) == nTimeSteps(t, Hour(1))
+      @test nTimeSteps(obm, Day(1)) == nTimeSteps(t, Day(1))
+      @test nTimeSteps(obm) == nTimeSteps(t)
+      @test_throws(ErrorException, dateToTimeStep(obm, date - Hour(1)))
+      @test(dateToTimeStep(obm, date) == dateToTimeStep(t, date))
+      @test(dateToTimeStep(obm, date + Hour(1)) == dateToTimeStep(t, date + Hour(1)))
+
+      @test eachTimeStep(obm) == eachTimeStep(t)
+      @test eachTimeStep(obm, from=timeBeginning(t) + Day(3)) == eachTimeStep(t, from=timeBeginning(t) + Day(3))
+      @test eachTimeStep(obm, to=timeBeginning(t) + Day(3)) == eachTimeStep(t, to=timeBeginning(t) + Day(3))
+      @test eachTimeStep(obm, duration=Day(4)) == eachTimeStep(t, duration=Day(4))
+      @test_throws(ErrorException, eachTimeStep(obm, to=date, duration=date)) # Can't set both
+      @test_throws(ErrorException, eachTimeStep(obm, duration=date)) # Bad type for duration
+      @test_throws(ErrorException, eachTimeStep(obm, to=Hour(1))) # Bad type for to
+      @test_throws(ErrorException, eachTimeStep(obm, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+      @test_throws(ErrorException, eachTimeStep(obm, to=1)) # Invalid argument type.
+      @test_throws(ErrorException, eachTimeStep(obm, from=date, to=date, duration=date)) # Can't set all parameters at once
+      @test_throws(ErrorException, eachTimeStep(obm, from=date, duration=date)) # Bad type for duration
+      @test_throws(ErrorException, eachTimeStep(obm, from=date, to=Hour(1))) # Bad type for to
+      @test_throws(ErrorException, eachTimeStep(obm, from=date, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+      @test_throws(TypeError, eachTimeStep(obm, from=1)) # Invalid argument type.
+
+      # Link to the methods of OrderBook.
+      @test orderBookDetails(obm) == orderBook(ob)
+      @test dates(obm) == dates(ob)
+      @test products(obm) == products(ob)
+      @test nProducts(obm) == nProducts(ob)
+      @test(dueBy(obm, DateTime(2009)) == dueBy(ob, DateTime(2009)))
+      @test(dueBy(obm, DateTime(2010)) == dueBy(ob, DateTime(2010)))
+      @test(dueBy(obm, DateTime(2011)) == dueBy(ob, DateTime(2011)))
+      @test(dueBy(obm, DateTime(2012)) == dueBy(ob, DateTime(2012)))
+      @test(dueBy(obm, DateTime(2009)) == dueBy(ob, DateTime(2009)))
+      @test(dueBy(obm, DateTime(2010)) == dueBy(ob, DateTime(2010)))
+      @test(dueBy(obm, DateTime(2011)) == dueBy(ob, DateTime(2011)))
+      @test(dueBy(obm, DateTime(2012)) == dueBy(ob, DateTime(2012)))
+      @test(dueBy(obm, DateTime(2009), cumulative=false) == dueBy(ob, DateTime(2009), cumulative=false))
+      @test(dueBy(obm, DateTime(2010), cumulative=false) == dueBy(ob, DateTime(2010), cumulative=false))
+      @test(dueBy(obm, DateTime(2011), cumulative=false) == dueBy(ob, DateTime(2011), cumulative=false))
+      @test(dueBy(obm, DateTime(2012), cumulative=false) == dueBy(ob, DateTime(2012), cumulative=false))
+      @test(dueBy(fromto(obm, DateTime(2010), DateTime(2011)), DateTime(2012)) == dueBy(fromto(ob, DateTime(2010), DateTime(2011)), DateTime(2012)))
+      @test(dueBy(fromto(obm, DateTime(2009), DateTime(2010)), DateTime(2012)) == dueBy(fromto(ob, DateTime(2009), DateTime(2010)), DateTime(2012)))
+      @test(dueBy(fromto(obm, DateTime(2011), DateTime(2012)), DateTime(2012)) == dueBy(fromto(ob, DateTime(2011), DateTime(2012)), DateTime(2012)))
+      @test(dueBy(fromto(obm, DateTime(2008), DateTime(2009)), DateTime(2012)) == dueBy(fromto(ob, DateTime(2008), DateTime(2009)), DateTime(2012)))
+      @test productIds(obm) == productIds(ob)
+      @test productId(obm, p) == productId(ob, p)
+      @test productFromId(obm, 1) == productFromId(ob, 1)
+
+      # Test with multiple products.
+      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      p2 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p1, 50), date + Day(4) => (p2, 50)))
+
+      m = Model(solver=CbcSolver(logLevel=0))
+      obm = OrderBookModel(m, ob, t)
+
+      @test productIds(obm) == productIds(ob)
+      @test productId(obm, p1) == productId(ob, p1)
+      @test productId(obm, p2) == productId(ob, p2)
+      @test productFromId(obm, 1) == productFromId(ob, 1)
+      @test productFromId(obm, 2) == productFromId(ob, 2)
+
+      # Warn when orders before the beginning of Timing or after its end.
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date - Day(2) => (p, 50)))
+      @test_warn "The latest order is at $(latest(ob)), but the optimisation starts later, at $(timeBeginning(t))." OrderBookModel(m, ob, t)
+
+      ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Week(2) => (p, 50)))
+      @test_warn "The earliest order is at $(earliest(ob)), but the optimisation ends sooner, at $(timeEnding(t))." OrderBookModel(m, ob, t)
+    end
+
     @testset "Plant" begin
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("LF", :lf)
@@ -816,7 +908,7 @@
     end
   end
 
-  @testset "Model building blocks" begin
+  @testset "Model building blocks (postConstraints)" begin
     @testset "Timing" begin
       @testset "Shifts and optimisation starts simultaneously" begin
         date = DateTime(2017, 01, 01, 08)

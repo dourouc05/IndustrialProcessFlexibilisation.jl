@@ -702,7 +702,7 @@
       @test_throws(ErrorException, eachTimeStep(t, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
       @test_throws(ErrorException, eachTimeStep(t, to=1)) # Invalid argument type.
 
-      @test_throws(ErrorException, eachTimeStep(t, from=d, to=d, duration=d)) # Can't set both
+      @test_throws(ErrorException, eachTimeStep(t, from=d, to=d, duration=d)) # Can't set all parameters at once
       @test_throws(ErrorException, eachTimeStep(t, from=d, duration=d)) # Bad type for duration
       @test_throws(ErrorException, eachTimeStep(t, from=d, to=Hour(1))) # Bad type for to
       @test_throws(ErrorException, eachTimeStep(t, from=d, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument

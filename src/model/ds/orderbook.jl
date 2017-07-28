@@ -11,7 +11,7 @@ struct OrderBookModel
         warn("The latest order is at $(latest(ob)), but the optimisation starts later, at $(timeBeginning(t)).")
       end
       if earliest(ob) >= timeEnding(t)
-        warn("The earliest order is at $(latest(ob)), but the optimisation ends sooner, at $(timeBeginning(t) + timeHorizon(t)).")
+        warn("The earliest order is at $(earliest(ob)), but the optimisation ends sooner, at $(timeEnding(t)).")
       end
     end
 
@@ -20,13 +20,13 @@ struct OrderBookModel
 end
 
 # Basic accessors for the model (needed to link to the subobjects).
-orderBook(ob::OrderBookModel) = ob.ob # TODO: To test.
-timing(ob::OrderBookModel) = ob.timing # TODO: To test.
+orderBook(ob::OrderBookModel) = ob.ob
+timing(ob::OrderBookModel) = ob.timing
 
 # Link to the methods of Timing.
 timeBeginning(ob::OrderBookModel) = timeBeginning(timing(ob))
 timeHorizon(ob::OrderBookModel) = timeHorizon(timing(ob))
-timeEnding(ob::OrderBookModel) = timeEnding(timing(ob)) # TODO: TO TEST
+timeEnding(ob::OrderBookModel) = timeEnding(timing(ob))
 timeStepDuration(ob::OrderBookModel) = timeStepDuration(timing(ob))
 
 nTimeSteps(ob::OrderBookModel, d::Period) = nTimeSteps(timing(ob), d)
@@ -35,14 +35,15 @@ dateToTimeStep(ob::OrderBookModel, d::DateTime) = dateToTimeStep(timing(ob), d)
 eachTimeStep(ob::OrderBookModel; kwargs...) = eachTimeStep(timing(ob); kwargs...)
 
 # Link to the methods of OrderBook.
-orderBookDetails(ob::OrderBookModel) = orderBook(orderBook(ob)) # TODO: To test. Should it exist?
-dates(ob::OrderBookModel) = dates(orderBook(ob)) # TODO: To test.
-products(ob::OrderBookModel) = products(orderBook(ob)) # TODO: To test.
-nProducts(ob::OrderBookModel) = nProducts(orderBook(ob)) # TODO: To test.
-dueBy(ob::OrderBookModel, dt::DateTime; kwargs...) = dueBy(orderBook(ob), dt; kwargs...) # TODO: To test.
-productIds(ob::OrderBookModel) = productIds(orderBook(ob)) # TODO: To test.
-productId(ob::OrderBookModel, p::Product) = productId(orderBook(ob), p) # TODO: To test.
-productFromId(ob::OrderBookModel, i::Int) = productFromId(orderBook(ob), i) # TODO: To test.
+orderBookDetails(ob::OrderBookModel) = orderBook(orderBook(ob))
+dates(ob::OrderBookModel) = dates(orderBook(ob))
+products(ob::OrderBookModel) = products(orderBook(ob))
+nProducts(ob::OrderBookModel) = nProducts(orderBook(ob))
+dueBy(ob::OrderBookModel, dt::DateTime; kwargs...) = dueBy(orderBook(ob), dt; kwargs...)
+fromto(ob::OrderBookModel, from::DateTime, to::DateTime) = fromto(orderBook(ob), from, to)
+productIds(ob::OrderBookModel) = productIds(orderBook(ob))
+productId(ob::OrderBookModel, p::Product) = productId(orderBook(ob), p)
+productFromId(ob::OrderBookModel, i::Int) = productFromId(orderBook(ob), i)
 
 
 function postConstraints(m::Model, ob::OrderBookModel, out::ImplicitEquipmentModel, alreadyProduced::Dict{Product, Float64}=Dict{Product, Float64}()) # TODO: To test.

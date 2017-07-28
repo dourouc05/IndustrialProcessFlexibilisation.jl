@@ -24,7 +24,7 @@ Evaluates the corresponding objective function `o` for the time step starting at
 The implementation of this function must be thought about for each new objective function. Its default implementation
 has a zero cost, which means that implementing it is not mandatory. See the documentation of `ProductionObjective`.
 """
-objectiveTimeStep(m::Model, o::ProductionObjective, pm::PlantModel, d::DateTime) = 0.
+objectiveTimeStep(m::Model, o::ProductionObjective, pm::PlantModel, d::DateTime) = AffExpr()
 
 """
 Evaluates the corresponding objective function `o` for the shift starting at `d`.
@@ -32,7 +32,7 @@ Evaluates the corresponding objective function `o` for the shift starting at `d`
 The implementation of this function must be thought about for each new objective function. Its default implementation
 has a zero cost, which means that implementing it is not mandatory. See the documentation of `ProductionObjective`.
 """
-objectiveShift(m::Model, o::ProductionObjective, pm::PlantModel, d::DateTime) = 0.
+objectiveShift(m::Model, o::ProductionObjective, pm::PlantModel, d::DateTime) = AffExpr()
 
 """
 Integrates the objective function over the whole optimisation horizon, both for the time steps (`objectiveTimeStep`)
@@ -48,7 +48,7 @@ function objective(m::Model, o::ProductionObjective, pm::PlantModel)
 
   # Sum over the shifts.
   d = timeBeginning(pm)
-  # for d in eachHour(pm) # TODO: implement the eachHour helper.
+  # for d in eachShift(pm) # TODO: implement the eachShift helper.
   while d <= timeEnding(pm)
     expr += objectiveShift(m, o, pm, d)
     d += shiftDuration(pm)
@@ -281,9 +281,9 @@ struct EnergyObjective <: ProductionObjective
   electricityPrice::TimeArray
 
   function EnergyObjective(electricityPrice::TimeArray, timing::Timing)
-    for d in eachTimeStep(timing) # TODO: To test explicitly!
+    for d in eachTimeStep(timing)
       if ! in(d, timestamp(electricityPrice))
-        error("There is no electricity price for time step " * string(d))
+        error("There is no electricity price for time step " * string(d)) # TODO: To test explicitly!
       end
     end
     return new(electricityPrice)

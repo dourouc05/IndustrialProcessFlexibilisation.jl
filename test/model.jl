@@ -874,6 +874,102 @@
       @test_warn "The earliest order is at $(earliest(ob)), but the optimisation ends sooner, at $(timeEnding(t))." OrderBookModel(m, ob, t)
     end
 
+    @testset "Objective" begin
+      @testset "Dummy objective" begin
+        e = Equipment("EAF", :eaf)
+        p = Plant([e], Route[])
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+
+        date = DateTime(2017, 01, 01, 08)
+        ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t)
+
+        dobj = DummyProductionObjective()
+        @test objectiveTimeStep(m, dobj, pm, date) == AffExpr()
+        @test objectiveTimeStep(m, dobj, pm, date + Hour(1)) == AffExpr()
+        @test objectiveShift(m, dobj, pm, date) == AffExpr()
+        @test objectiveShift(m, dobj, pm, date + Hour(8)) == AffExpr()
+        @test objective(m, dobj, pm) == AffExpr()
+        @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == AffExpr()
+      end
+
+      @testset "No objective" begin
+        e = Equipment("EAF", :eaf)
+        p = Plant([e], Route[])
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+
+        date = DateTime(2017, 01, 01, 08)
+        ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t)
+
+        dobj = NoObjective()
+        @test objectiveTimeStep(m, dobj, pm, date) == AffExpr()
+        @test objectiveTimeStep(m, dobj, pm, date + Hour(1)) == AffExpr()
+        @test objectiveShift(m, dobj, pm, date) == AffExpr()
+        @test objectiveShift(m, dobj, pm, date + Hour(8)) == AffExpr()
+        @test objective(m, dobj, pm) == AffExpr()
+        @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == AffExpr()
+      end
+
+      @testset "Energy objective: normal case" begin
+        e = Equipment("EAF", :eaf)
+        p = Plant([e], Route[])
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+
+        date = DateTime(2017, 01, 01, 08)
+        ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t)
+
+        ep = [rand() for _ in eachTimeStep(t)]
+        ep_ts = TimeArray([ts for ts in eachTimeStep(t)], ep)
+        dobj = EnergyObjective(ep_ts)
+
+        @test electricityPrice(dobj) == ep_ts
+        @test electricityPrice(dobj, date) == ep[1]
+        @test electricityPrice(dobj, date + Hour(1)) == ep[2]
+        @test_broken electricityPrice(dobj, date - Hour(1)) # TODO: Should fail with an error.
+        @test_broken electricityPrice(dobj, date + Week(1) + Hour(1)) # TODO: Should fail with an error.
+
+        eq = collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm))))[1]
+        @test objective(m, dobj, pm) == sum(values(ep_ts[ts])[1] * consumption(eq, p1, ts) for ts in eachTimeStep(t))
+        @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == sum(ep[ts + 1] * consumption(eq, p1, date + Hour(ts)) for ts in 1:7)
+      end
+
+      @testset "Objective combination" begin # TODO
+        e = Equipment("EAF", :eaf)
+        p = Plant([e], Route[])
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+
+        date = DateTime(2017, 01, 01, 08)
+        ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t)
+
+        # dobj = DummyProductionObjective()
+        # @test objectiveTimeStep(m, dobj, pm, date) == 0.0
+        # @test objectiveTimeStep(m, dobj, pm, date + Hour(1)) == 0.0
+        # @test objectiveShift(m, dobj, pm, date) == 0.0
+        # @test objectiveShift(m, dobj, pm, date + Hour(8)) == 0.0
+        # @test objective(m, dobj, pm) == 0.0
+        # @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == 0.0
+      end
+    end
+
     @testset "Plant" begin
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("LF", :lf)

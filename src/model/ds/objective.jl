@@ -283,7 +283,7 @@ struct EnergyObjective <: ProductionObjective
   function EnergyObjective(electricityPrice::TimeArray, timing::Timing)
     for d in eachTimeStep(timing)
       if ! in(d, timestamp(electricityPrice))
-        error("There is no electricity price for time step " * string(d)) # TODO: To test explicitly!
+        error("There is no electricity price for time step " * string(d))
       end
     end
     return new(electricityPrice)
@@ -297,14 +297,14 @@ end
 """
 Retrieves the time series from the electricity objective.
 """
-electricityPrice(eo::EnergyObjective) = eo.electricityPrice # TODO: To test!
+electricityPrice(eo::EnergyObjective) = eo.electricityPrice
 
 """
 Retrieves the energy price at time `d`.
 """
-electricityPrice(eo::EnergyObjective, d::DateTime) = electricityPrice(eo)[d].values[1] # TODO: To test!
+electricityPrice(eo::EnergyObjective, d::DateTime) = electricityPrice(eo)[d].values[1]
 
-function objectiveTimeStep(m::Model, eo::EnergyObjective, pm::PlantModel, d::DateTime) # TODO: To test!
+function objectiveTimeStep(m::Model, eo::EnergyObjective, pm::PlantModel, d::DateTime)
   expr = AffExpr()
   for (eqName, eq) in equipmentModels(pm)
     for p in products(pm)
@@ -355,7 +355,19 @@ end
 function objectiveShift(m::Model, hro::HRCostObjective, pm::PlantModel, d::DateTime)
   hrm = timingModel(pm)
 
-  # TODO: Check d corresponds to the beginning of a shift.
+  # Check whether d is the beginning of a shift.
+  # TODO: Only applies as such when shifts have a fixed length. Otherwise, could be replaced by a test on the discretisation of the shifts (if multiple of 2 hours, then must be at shiftBeginning + k * 2 hours).
+  dt = shiftBeginning(hrm)
+  while dt <= d
+    if d == dt
+      break
+    else
+      dt += shiftDuration(hrm)
+    end
+  end
+  if dt > d
+    error("The given date $(d) does not correspond to the beginning of a shift.")
+  end
 
   # First accumulate the cost for each hour.
   shiftCost = 0.0

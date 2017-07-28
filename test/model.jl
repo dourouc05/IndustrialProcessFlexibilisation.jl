@@ -933,8 +933,8 @@
         pm = PlantModel(m, p, ob, t)
 
         ep = [rand() for _ in eachTimeStep(t)]
-        ep_ts = TimeArray([ts for ts in eachTimeStep(t)], ep)
-        dobj = EnergyObjective(ep_ts)
+        ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
+        dobj = EnergyObjective(ep_ts, t)
 
         @test electricityPrice(dobj) == ep_ts
         @test electricityPrice(dobj, date) == ep[1]
@@ -945,6 +945,52 @@
         eq = collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm))))[1]
         @test objective(m, dobj, pm) == sum(values(ep_ts[ts])[1] * consumption(eq, p1, ts) for ts in eachTimeStep(t))
         @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == sum(ep[ts + 1] * consumption(eq, p1, date + Hour(ts)) for ts in 1:7)
+      end
+
+      @testset "Energy objective: not enough data" begin
+        e = Equipment("EAF", :eaf)
+        p = Plant([e], Route[])
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+
+        date = DateTime(2017, 01, 01, 08)
+        ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t)
+
+        ep = [rand() for _ in eachTimeStep(t)][4:end]
+        ep_ts = TimeArray(collect(eachTimeStep(t))[4:end], ep)
+        @test EnergyObjective(ep_ts) == EnergyObjective(ep_ts) # Basic constructor performs no check and sees no error.
+        @test_throws ErrorException EnergyObjective(ep_ts, t) # The main constructor checks for consistency.
+      end
+
+      @testset "HR objective" begin
+        e = Equipment("EAF", :eaf)
+        p = Plant([e], Route[])
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+
+        date = DateTime(2017, 01, 01, 08)
+        ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t)
+        hrm = timingModel(pm)
+
+        f = (d::DateTime) -> Dates.hour(d)
+        o = HRCostObjective(f)
+
+        @test objectiveShift(m, o, pm, date) == sum(f(dt) for dt in date : Hour(1) : date + Hour(7)) * shiftOpen(hrm, date)
+        @test_throws ErrorException objectiveShift(m, o, pm, date + Hour(1)) # Not the beginning of a shift.
+
+        f = (d::DateTime) -> 0.0
+        o = HRCostObjective(f)
+
+        @test objectiveShift(m, o, pm, date) == AffExpr()
+        @test_throws ErrorException objectiveShift(m, o, pm, date + Hour(1)) # Not the beginning of a shift.
       end
 
       @testset "Objective combination" begin # TODO

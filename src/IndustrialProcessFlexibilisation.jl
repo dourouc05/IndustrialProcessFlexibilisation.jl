@@ -2,7 +2,9 @@ module IndustrialProcessFlexibilisation
   ## Exports for data structures (data/).
   # Genera data structures (data/)
   export Timing
-  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, shiftBeginning, shiftDuration, nOccurrencesPerPeriod, nTimeSteps, nTimeStepsPerShift, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep, dateToShift, shift
+  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, nOccurrencesPerPeriod, nTimeSteps, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep
+  export Shifts
+  export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, nTimeStepsPerShift, dateToShift, shift
   # Plant data structures (data/plant/)
   export ConsumptionModel, NoConsumption, ConstantConsumption, LinearConsumption, QuadraticConsumption, PiecewiseLinearConsumption,
          AbstractEquipment, Equipment, ImplicitEquipment, InImplicitEquipment, OutImplicitEquipment, inEquipment, outEquipment,
@@ -51,11 +53,11 @@ module IndustrialProcessFlexibilisation
 
   using MathProgBase
   using JuMP
-  using Nemo
 
   using HDF5
 
-  solve = JuMP.solve # Resolve conflict between Nemo and JuMP
+  # using Nemo
+  # solve = JuMP.solve # Resolve conflict between Nemo and JuMP
 
   import Base: start, next, done, eltype, length, copy, find, ==, hash, writecsv, replace, convert
   import Base.Random: rand

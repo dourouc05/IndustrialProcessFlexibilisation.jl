@@ -993,7 +993,7 @@
         @test_throws ErrorException objectiveShift(m, o, pm, date + Hour(1)) # Not the beginning of a shift.
       end
 
-      @testset "Objective combination" begin # TODO
+      @testset "Objective combination" begin
         e = Equipment("EAF", :eaf)
         p = Plant([e], Route[])
         c = ConstantConsumption(2.0)
@@ -1005,14 +1005,16 @@
 
         m = Model(solver=CbcSolver(logLevel=0))
         pm = PlantModel(m, p, ob, t)
+        hrm = timingModel(pm)
 
-        # dobj = DummyProductionObjective()
-        # @test objectiveTimeStep(m, dobj, pm, date) == 0.0
-        # @test objectiveTimeStep(m, dobj, pm, date + Hour(1)) == 0.0
-        # @test objectiveShift(m, dobj, pm, date) == 0.0
-        # @test objectiveShift(m, dobj, pm, date + Hour(8)) == 0.0
-        # @test objective(m, dobj, pm) == 0.0
-        # @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == 0.0
+        f = (d::DateTime) -> Dates.hour(d)
+        hro = HRCostObjective(f)
+
+        ep = [rand() for _ in eachTimeStep(t)]
+        ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
+        eo = EnergyObjective(ep_ts, t)
+
+        co = ObjectiveCombination([hro, eo], [.5, .75], [:hr, :en])
       end
     end
 

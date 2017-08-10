@@ -112,12 +112,12 @@ struct ObjectiveCombination <: ProductionObjective # TODO: To test!
     # A few sanity checks.
     if length(objectives) != length(weights)
       error("Different number of objective functions and weights: " * string(length(objectives)) * " objectives, "
-              * string(length(weights)) * " weights.")
+              * string(length(weights)) * " weights.")) # TODO: To test explicitly!
     end
 
     if length(symbols) > 0 && length(objectives) != length(symbols)
       error("Different number of objective functions and symbols: " * string(length(objectives)) * " objectives, "
-              * string(length(symbols)) * " symbols.")
+              * string(length(symbols)) * " symbols.")) # TODO: To test explicitly!
     end
 
     # Generate the symbols if they are not provided. Otherwise, perform some sanity check.

@@ -2,9 +2,9 @@
 Describes all shift issues in a problem to solve: the beginning of the first shift (which may be before the beginning
 of the optimisation, as described in a `Timing` object), and the possible durations for the shifts.
 
-  * `shiftBeginning`: date at which the first shift begins (for example, `now()` or `DateTime(2016, 12, 15, 6)`);
+  * `beginning`: date at which the first shift begins (for example, `now()` or `DateTime(2016, 12, 15, 6)`);
     it may be before `timeBeginning`, but not after
-  * `shiftDuration`: duration of a worker's shift (for example, `Hour(8)`). It may be either a duration or a range
+  * `durations`: duration of a worker's shift (for example, `Hour(8)`). It may be either a duration or a range
     of durations (if the shift length may vary). If values are given as integers, they are considered as hours. 
 """
 struct Shifts
@@ -16,13 +16,21 @@ struct Shifts
       error("No shift duration given. Please provide at least one.")
     end
 
+    if durations.start == Hour(0)
+      error("The minimum shift duration must be at least one hour; it is currently zero.")
+    end
+
+    # The next two hypotheses are used when building the model, to ease the use of the created variables. 
+    if durations.start % durations.step != Hour(0)
+      error("The minimum shift duration ($(durations.start)) is not a multiple of the step ($(durations.step)).")
+    end
+    if durations.stop % durations.step != Hour(0)
+      error("The maximum shift duration ($(durations.stop)) is not a multiple of the step ($(durations.step)).")
+    end
+
     return new(beginning, durations)
   end
 end
-
-Shifts(beginning::DateTime, durations::StepRange{Int, Int}) = Shifts(beginning, Hour(durations.start) : Hour(durations.step) : Hour(durations.stop))
-Shifts(beginning::DateTime, shiftDuration::Hour) = Shifts(beginning, shiftDuration : Hour(1) : shiftDuration)
-Shifts(beginning::DateTime, shiftDuration::Int) = Shifts(beginning, Hour(shiftDuration) : Hour(1) : Hour(shiftDuration))
 
 function Shifts(timing::Timing, beginning::DateTime, durations)
   if beginning > timeBeginning(timing)
@@ -31,6 +39,13 @@ function Shifts(timing::Timing, beginning::DateTime, durations)
 
   return Shifts(beginning, durations)
 end
+
+Shifts(timing::Timing, beginning::DateTime, durations::StepRange{Int, Int}) = 
+  Shifts(timing, beginning, Hour(durations.start) : Hour(durations.step) : Hour(durations.stop))
+Shifts(timing::Timing, beginning::DateTime, shiftDuration::Hour) = 
+  Shifts(timing, beginning, shiftDuration : Hour(1) : shiftDuration)
+Shifts(timing::Timing, beginning::DateTime, shiftDuration::Int) = 
+  Shifts(timing, beginning, Hour(shiftDuration) : Hour(1) : Hour(shiftDuration))
 
 shiftBeginning(s::Shifts) = s.beginning
 shiftDurations(s::Shifts) = collect(s.durations)
@@ -69,11 +84,33 @@ function nShifts(t::Timing, s::Shifts)
 end
 
 function nShifts(t::Timing, s::Shifts, sl::TimePeriod)
-  allDurations = shiftDurations(s)
-  if sl in allDurations
+  allowedDurations = shiftDurations(s)
+  push!(allowedDurations, shiftDurationsStep(s))
+
+  if sl in allowedDurations
     return ceil(Int, Dates.toms(timeHorizon(t)) / Dates.toms(sl)) +
       ceil(Int, min(Dates.toms((timeBeginning(t) - shiftBeginning(s))), Dates.toms(sl)) / Dates.toms(sl))
   else
-    error("Given duration $(sl) not found in the durations allowed by the Shifts object. Allowed durations are: $(allDurations)")
+    error("Given duration $(sl) not found in the durations allowed by the Shifts object. Allowed durations are: $(allowedDurations)")
   end
 end
+
+"""
+Computes the number of minimum-length shifts between `d` and the beginning of the shifts within `t`. If this number is not integer,
+the closest integer is returned.
+"""
+function dateToShift(s::Shifts, d::DateTime)
+  if d < shiftBeginning(t)
+    error("Time " * string(d) * " before the shift beginning (" * string(shiftBeginning(t)) * ").")
+  end
+
+  delta = Millisecond(d - shiftBeginning(t)).value
+  return 1 + floor(Int, delta / Dates.toms(shiftDurationsStart(s)))
+end
+
+"""
+Shifts the shifts object by the given period `p`. This means that the beginning will be shifted by `p`.
+
+See the corresponding method for `Timing`. 
+"""
+shift(s::Shifts, p::Period) = Shifts(beginning=shiftBeginning(s) + p, duration=shiftDuration(s))

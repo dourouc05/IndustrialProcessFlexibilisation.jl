@@ -82,23 +82,11 @@ function dateToTimeStep(t::Timing, d::DateTime)
 end
 
 """
-Computes the number of shifts between `d` and the beginning of the shifts within `t`. If this number is not integer,
-the closest integer is returned.
-"""
-function dateToShift(t::Timing, d::DateTime)
-  if d < shiftBeginning(t)
-    error("Time " * string(d) * " before the shift beginning (" * string(shiftBeginning(t)) * ").")
-  end
-
-  delta = Millisecond(d - shiftBeginning(t)).value
-  return 1 + floor(Int, delta / Dates.toms(shiftDuration(t)))
-end
-
-"""
-Shifts the timing object by the given period `p`. This means that the beginnings (both optimisation and shifts)
-will be shifted by `p`.
+Shifts the timing object by the given period `p`. This means that the beginning will be shifted by `p`.
 
 The optimisation horizon can be set with the `horizon` keyword argument.
+
+See the corresponding method for `Shifts`. 
 """
 function shift(t::Timing, p::Period; horizon::Period=Day(0))
   if horizon > Day(0)
@@ -106,6 +94,5 @@ function shift(t::Timing, p::Period; horizon::Period=Day(0))
   else
     newHorizon = timeHorizon(t)
   end
-  return Timing(timeBeginning=timeBeginning(t) + p, timeHorizon=newHorizon, timeStepDuration=timeStepDuration(t),
-                shiftBeginning=shiftBeginning(t) + p, shiftDuration=shiftDuration(t))
+  return Timing(timeBeginning=timeBeginning(t) + p, timeHorizon=newHorizon, timeStepDuration=timeStepDuration(t))
 end

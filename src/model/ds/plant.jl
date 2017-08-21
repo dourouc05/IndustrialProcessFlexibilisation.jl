@@ -2,6 +2,7 @@ struct PlantModel
   plant::Plant
   orderBook::OrderBook
   timing::Timing
+  shifts::Shifts
 
   hr::TimingModel
   equipments::Dict{AbstractString, AbstractEquipmentModel} # (name of equipment) -> equipment
@@ -10,7 +11,7 @@ struct PlantModel
   # and the outflow of finished products.
   ob::OrderBookModel
 
-  function PlantModel(m::Model, p::Plant, ob::OrderBook, timing::Timing)
+  function PlantModel(m::Model, p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts)
     # Create the variables for the HR part of the model.
     hr = TimingModel(m, timing)
 
@@ -125,7 +126,7 @@ struct PlantModel
 
     orderBookModel = OrderBookModel(m, ob, timing)
 
-    return new(p, ob, timing, hr, eqs, flows, orderBookModel)
+    return new(p, ob, timing, shifts, hr, eqs, flows, orderBookModel)
   end
 end
 
@@ -133,6 +134,7 @@ end
 plant(pm::PlantModel) = pm.plant # TODO: To test!
 orderBook(pm::PlantModel) = pm.orderBook # TODO: To test!
 timing(pm::PlantModel) = pm.timing # TODO: To test!
+shifts(pm::PlantModel) = pm.shifts # TODO: To test!
 
 timingModel(pm::PlantModel) = pm.hr
 equipmentModels(pm::PlantModel) = pm.equipments
@@ -150,13 +152,19 @@ timeBeginning(pm::PlantModel) = timeBeginning(timing(pm))
 timeHorizon(pm::PlantModel) = timeHorizon(timing(pm))
 timeEnding(pm::PlantModel) = timeEnding(timing(pm)) # TODO: To test!
 timeStepDuration(pm::PlantModel) = timeStepDuration(timing(pm))
-shiftBeginning(pm::PlantModel) = shiftBeginning(timing(pm))
-shiftDuration(pm::PlantModel) = shiftDuration(timing(pm))
 
 nTimeSteps(pm::PlantModel, d::Period) = nTimeSteps(timing(pm), d) 
 nTimeSteps(pm::PlantModel) = nTimeSteps(timing(pm))
 dateToTimeStep(pm::PlantModel, d::DateTime) = dateToTimeStep(timing(pm), d)
 eachTimeStep(pm::PlantModel; kwargs...) = eachTimeStep(timing(pm); kwargs...)
+
+# Link to the methods of Shifts. 
+shiftBeginning(pm::PlantModel) = shiftBeginning(shifts(pm))
+shiftDurations(pm::PlantModel) = shiftDurations(shifts(pm))
+shiftDurationsStart(pm::PlantModel) = shiftDurationsStart(shifts(pm)) # TODO: TO TEST! 
+shiftDurationsStep(pm::PlantModel) = shiftDurations(shifStepts(pm)) # TODO: TO TEST! 
+shiftDurationsStop(pm::PlantModel) = shiftDurations(shifts(pStopm)) # TODO: TO TEST! 
+nShiftDurations(pm::PlantModel) = nShiftDurations(shifts(pm)) # TODO: TO TEST! 
 
 # Link to the methods of OrderBook.
 orderBookDetails(pm::PlantModel) = orderBook(orderBook(pm))

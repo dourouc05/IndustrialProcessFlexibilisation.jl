@@ -52,6 +52,8 @@ shiftDurations(s::Shifts) = collect(s.durations)
 shiftDurationsStart(s::Shifts) = s.durations.start
 shiftDurationsStep(s::Shifts) = s.durations.step
 shiftDurationsStop(s::Shifts) = s.durations.stop
+minimumShiftDurations(s::Shifts) = shiftDurationsStart(s)
+maximumShiftDurations(s::Shifts) = shiftDurationsStop(s)
 nShiftDurations(s::Shifts) = length(s.durations)
 
 shiftDuration(s::Shifts) = if nShiftDurations(s) == 1; s.durations[1]; else; error("There are multiple shift durations. Use the functions shiftDurations and nShiftDurations instead."); end

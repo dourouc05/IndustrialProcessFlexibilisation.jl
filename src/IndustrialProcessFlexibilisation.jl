@@ -56,6 +56,7 @@ module IndustrialProcessFlexibilisation
 
   using HDF5
 
+  # Nemo disabled for now (could be used for a reformulation of the HR problem, but not working right now). 
   # using Nemo
   # solve = JuMP.solve # Resolve conflict between Nemo and JuMP
 
@@ -64,6 +65,7 @@ module IndustrialProcessFlexibilisation
   import TimeSeries: from, to
 
   include("data/data.jl")
+  include("utils/shifts.jl")
   include("model/model.jl")
   include("io/datastructures_io.jl")
   include("io/results_io.jl")

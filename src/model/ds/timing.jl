@@ -49,14 +49,11 @@ dateToShift(hr::TimingModel, d::DateTime) = dateToShift(shifts(hr), d)
 
 
 # Define the constraints.
-function postConstraints(m::Model, hr::TimingModel)
+function postConstraints(m::Model, hr::TimingModel, forcedShifts::Array{Int, 1})
   # No link between time steps and shifts: time steps are linked to shifts directly through indexing.
 
   # TODO: Use a post-processor (for shifts 2:2:8, only implement 2-hour shifts in the model to keep it small, then choose how to make longer shifts outside the model, by merging small shifts so that, for each sequence, the number of combined shifts is minimum, with a minimum discrepancy between the lengths: prefer to have two 6-hour shifts rather than 8 then 4 hours)
-end
 
-function postConstraints(m::Model, hr::TimingModel, forcedShifts::Array{Int, 1})
-  # TODO: Use me! 
   # Some shifts have already been decided previously.
   for s in 1:length(forcedShifts)
     @constraint(m, shiftOpen(hr, s) == forcedShifts[s]) # TODO: Rewrite forcedShifts as a more common data structure for this (with DateTime rather than indices).

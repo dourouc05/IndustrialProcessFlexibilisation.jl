@@ -105,7 +105,7 @@ function dateToShift(s::Shifts, d::DateTime)
   end
 
   delta = Millisecond(d - shiftBeginning(t)).value
-  return 1 + floor(Int, delta / Dates.toms(shiftDurationsStart(s)))
+  return 1 + floor(Int, delta / Dates.toms(shiftDurationsStep(s))) 
 end
 
 """

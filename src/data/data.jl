@@ -5,6 +5,6 @@ include("plant/plant.jl")
 include("orderbook/product.jl")
 include("orderbook/orderbook.jl")
 include("timing.jl")
-include("hr.jl")
+include("shifts.jl")
 
 include("plant/plant_fwd.jl")

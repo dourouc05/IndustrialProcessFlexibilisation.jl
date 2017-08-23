@@ -1,64 +1,69 @@
 @testset "Optimisation models" begin
   @testset "Specific data structures" begin
     @testset "Timing" begin
-      date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
-      m = Model(solver=CbcSolver(logLevel=0))
-      hrm = TimingModel(m, t)
+      @testset "Basic case" begin
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+        m = Model(solver=CbcSolver(logLevel=0))
+        hrm = TimingModel(m, t, s)
 
-      @test(timing(hrm) == t)
-      @test(timeBeginning(hrm) == timeBeginning(t))
-      @test(timeHorizon(hrm) == timeHorizon(t))
-      @test(timeEnding(hrm) == timeEnding(t))
-      @test(timeStepDuration(hrm) == timeStepDuration(t))
-      @test(shiftBeginning(hrm) == shiftBeginning(t))
-      @test(shiftDuration(hrm) == shiftDuration(t))
+        @test(timing(hrm) == t)
+        @test(timeBeginning(hrm) == timeBeginning(t))
+        @test(timeHorizon(hrm) == timeHorizon(t))
+        @test(timeEnding(hrm) == timeEnding(t))
+        @test(timeStepDuration(hrm) == timeStepDuration(t))
+        @test(shiftBeginning(hrm) == shiftBeginning(t))
+        @test(shiftDuration(hrm) == shiftDuration(t))
 
-      @test(nTimeSteps(hrm) == 48)
-      @test(nTimeSteps(hrm, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
-      @test(nTimeSteps(hrm, Day(1)) == 24)
-      @test(nTimeStepsPerShift(hrm) == 8)
-      @test(nShifts(hrm) == 6)
+        @test(nTimeSteps(hrm) == 48)
+        @test(nTimeSteps(hrm, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
+        @test(nTimeSteps(hrm, Day(1)) == 24)
+        @test(nTimeStepsPerShift(hrm) == 8)
+        @test(nShifts(hrm) == 6)
 
-      @test_throws(ErrorException, dateToTimeStep(hrm, date - Hour(1)))
-      @test(dateToTimeStep(hrm, date) == 1)
-      @test(dateToTimeStep(hrm, date + Minute(15)) == 1)
-      @test(dateToTimeStep(hrm, date + Hour(1)) == 2)
-      @test(dateToTimeStep(hrm, date + Hour(8)) == 9) # One shift.
-      @test(dateToTimeStep(hrm, date + Hour(47)) == 48) # Optimisation horizon.
+        @test_throws(ErrorException, dateToTimeStep(hrm, date - Hour(1)))
+        @test(dateToTimeStep(hrm, date) == 1)
+        @test(dateToTimeStep(hrm, date + Minute(15)) == 1)
+        @test(dateToTimeStep(hrm, date + Hour(1)) == 2)
+        @test(dateToTimeStep(hrm, date + Hour(8)) == 9) # One shift.
+        @test(dateToTimeStep(hrm, date + Hour(47)) == 48) # Optimisation horizon.
 
-      @test_throws(ErrorException, dateToShift(hrm, date - Hour(1)))
-      @test(dateToShift(hrm, date) == 1)
-      @test(dateToShift(hrm, date + Hour(5)) == 1)
-      @test(dateToShift(hrm, date + Hour(7)) == 1)
-      @test(dateToShift(hrm, date + Hour(8)) == 2)
-      @test(dateToShift(hrm, date + Hour(12)) == 2)
+        @test_throws(ErrorException, dateToShift(hrm, date - Hour(1)))
+        @test(dateToShift(hrm, date) == 1)
+        @test(dateToShift(hrm, date + Hour(5)) == 1)
+        @test(dateToShift(hrm, date + Hour(7)) == 1)
+        @test(dateToShift(hrm, date + Hour(8)) == 2)
+        @test(dateToShift(hrm, date + Hour(12)) == 2)
 
-      # Optimisation variable accessors.
-      @test(shiftOpen(hrm, 1) == hrm.shiftOpen[1])
+        # Optimisation variable accessors.
+        @test(shiftOpen(hrm, 1) == hrm.shiftOpen[1])
 
-      @test(timeStepOpen(hrm, date) == shiftOpen(hrm, 1))
-      @test(timeStepOpen(hrm, date + Minute(15)) == shiftOpen(hrm, 1))
-      @test(timeStepOpen(hrm, date + Hour(15)) == shiftOpen(hrm, 2))
+        @test(timeStepOpen(hrm, date) == shiftOpen(hrm, 1))
+        @test(timeStepOpen(hrm, date + Minute(15)) == shiftOpen(hrm, 1))
+        @test(timeStepOpen(hrm, date + Hour(15)) == shiftOpen(hrm, 2))
+      end
 
-      # TODO: More involved tests: the beginning of the shifts is four hours before the optimisation.
-      date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
-      m = Model(solver=CbcSolver(logLevel=0))
-      hrm = TimingModel(m, t)
+      @testset "Beginning of the shifts is four hours before the optimisation" begin
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date - Hour(4), Hour(8))
+        m = Model(solver=CbcSolver(logLevel=0))
+        hrm = TimingModel(m, t, s)
 
-      @test_throws(ErrorException, dateToShift(hrm, date - Hour(4) - Hour(1)))
-      @test(dateToShift(hrm, date - Hour(4)) == 1)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(5)) == 1)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(7)) == 1)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(8)) == 2)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(12)) == 2)
+        @test_throws(ErrorException, dateToShift(hrm, date - Hour(4) - Hour(1)))
+        @test(dateToShift(hrm, date - Hour(4)) == 1)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(5)) == 1)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(7)) == 1)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(8)) == 2)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(12)) == 2)
+      end
     end
 
     @testset "Equipment" begin
       @testset "One product, one time step" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
         e = Equipment("EAF", :eaf)
         c = ConstantConsumption(2.0)
@@ -210,7 +215,7 @@
 
       @testset "Multiple products, one time step" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
         e = Equipment("EAF", :eaf)
         c = ConstantConsumption(2.0)
@@ -372,7 +377,7 @@
 
       @testset "One product, multiple time steps" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15))
 
         e = Equipment("EAF", :eaf) # One-hour duration
         c = ConstantConsumption(2.0)
@@ -531,7 +536,7 @@
 
       @testset "One product, multiple time steps" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15))
 
         e = Equipment("EAF", :eaf) # One-hour duration
         c = ConstantConsumption(2.0)
@@ -703,7 +708,7 @@
     @testset "Consumption" begin
       @testset "No consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = NoConsumption()
@@ -719,7 +724,7 @@
 
       @testset "Constant consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = ConstantConsumption(2.0)
@@ -735,7 +740,7 @@
 
       @testset "Linear consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = LinearConsumption(2.0, 4.0)
@@ -751,7 +756,7 @@
 
       @testset "Quadratic consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = QuadraticConsumption(2.0, 4.0, 8.0)
@@ -767,7 +772,7 @@
 
       @testset "Piecewise linear consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = PiecewiseLinearConsumption([1.0, 2.0], [4.0, 8.0])
@@ -784,7 +789,7 @@
 
     @testset "Order book" begin
       date = DateTime(2010, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
       e = Equipment("EAF", :eaf)
       c = ConstantConsumption(2.0)
@@ -883,10 +888,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         dobj = DummyProductionObjective()
         @test objectiveTimeStep(m, dobj, pm, date) == AffExpr()
@@ -905,10 +911,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         dobj = NoObjective()
         @test objectiveTimeStep(m, dobj, pm, date) == AffExpr()
@@ -927,10 +934,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         ep = [rand() for _ in eachTimeStep(t)]
         ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
@@ -955,10 +963,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         ep = [rand() for _ in eachTimeStep(t)][4:end]
         ep_ts = TimeArray(collect(eachTimeStep(t))[4:end], ep)
@@ -974,10 +983,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
         hrm = timingModel(pm)
 
         f = (d::DateTime) -> Dates.hour(d)
@@ -1001,10 +1011,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
         hrm = timingModel(pm)
 
         f = (d::DateTime) -> Dates.hour(d)
@@ -1038,10 +1049,11 @@
       ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
 
       date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+      s = Shitfs(shiftBeginning=date, Hour(8))
 
       m = Model(solver=CbcSolver(logLevel=0))
-      pm = PlantModel(m, p, ob, t)
+      pm = PlantModel(m, p, ob, t, s)
 
       # Basic accessors.
       @test(timingModel(pm) == pm.hr)
@@ -1056,13 +1068,14 @@
     @testset "Timing" begin
       @testset "Shifts and optimisation starts simultaneously" begin
         date = DateTime(2017, 01, 01, 08)
-        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         # Check the constraints behave as expected.
         # First shift 8:00-16:00: if the second time step is open, then the shift is open. (Actually, this constraint is
         # automatically rewritten as a shift opening.)
         m = Model(solver=CbcSolver(logLevel=0))
-        hrm = TimingModel(m, t)
+        hrm = TimingModel(m, t, s)
         postConstraints(m, hrm)
         @constraint(m, timeStepOpen(hrm, date + Hour(1)) == 1.)
         solve(m)
@@ -1070,7 +1083,7 @@
 
         # If the shift 16:00-0:00 is open, and if only one shift is allowed, then the maximum number of time steps is eight.
         m = Model(solver=CbcSolver(logLevel=0))
-        hrm = TimingModel(m, t)
+        hrm = TimingModel(m, t, s)
         postConstraints(m, hrm)
         @constraint(m, shiftOpen(hrm, 1) == 0.)
         @constraint(m, shiftOpen(hrm, 2) == 1.)
@@ -1084,11 +1097,12 @@
 
       @testset "Shifts begin before optimisation" begin
         date = DateTime(2017, 01, 01, 08)
-        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date - Hour(4), Hour(8))
 
         # If the first shift is open, can work at most four hours.
         m = Model(solver=CbcSolver(logLevel=0))
-        hrm = TimingModel(m, t)
+        hrm = TimingModel(m, t, s)
         postConstraints(m, hrm)
         @constraint(m, shiftOpen(hrm, 1) == 1.)
         for i in 2:nShifts(hrm)
@@ -1117,7 +1131,8 @@
     ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
 
     date = DateTime(2017, 01, 01, 08)
-    t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+    t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+    s = Shifts(t, date, Hour(8))
 
     epDates = collect(date:Hour(1):date + Week(5))
     ep = TimeArray(epDates, 50 + 10 * sin.(1:length(epDates)) + rand(length(epDates)))
@@ -1140,7 +1155,7 @@
     o = ObjectiveCombination([eo, hro])
 
     # The model should be built without error.
-    status, pm, m, shiftsOpen, productionRaw = productionModel(p, ob, t, o, solver=CbcSolver(logLevel=0))
+    status, pm, m, shiftsOpen, productionRaw = productionModel(p, ob, t, s, o, solver=CbcSolver(logLevel=0))
     @test(status)
   end
 

@@ -32,7 +32,7 @@
 
   @testset "Objective shortcut" begin
     date = DateTime(2017, January, 1, 6)
-    t = Timing(timeBeginning=date, timeHorizon=Week(4), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+    t = Timing(timeBeginning=date, timeHorizon=Week(4), timeStepDuration=Hour(1))
 
     epDates = collect(date:Hour(1):date + Week(52))
     epRaw = 50 + 20 * sin.(1:length(epDates))

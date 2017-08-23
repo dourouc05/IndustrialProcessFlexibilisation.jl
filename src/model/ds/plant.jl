@@ -13,7 +13,7 @@ struct PlantModel
 
   function PlantModel(m::Model, p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts)
     # Create the variables for the HR part of the model.
-    hr = TimingModel(m, timing)
+    hr = TimingModel(m, timing, shifts)
 
     # Consistency check: the plant must have the required equipments for all the products in the order book.
     for pr in products(ob) # TODO: To check!

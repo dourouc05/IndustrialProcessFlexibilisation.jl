@@ -12,7 +12,7 @@ struct Shifts
   durations::StepRange{Hour, Hour}
   
   function Shifts(beginning::DateTime, durations::StepRange{Hour, Hour})
-    if length(shiftDurations) == 0
+    if length(durations) == 0
       error("No shift duration given. Please provide at least one.")
     end
 
@@ -43,9 +43,9 @@ end
 Shifts(timing::Timing, beginning::DateTime, durations::StepRange{Int, Int}) = 
   Shifts(timing, beginning, Hour(durations.start) : Hour(durations.step) : Hour(durations.stop))
 Shifts(timing::Timing, beginning::DateTime, shiftDuration::Hour) = 
-  Shifts(timing, beginning, shiftDuration : Hour(1) : shiftDuration)
+  Shifts(timing, beginning, shiftDuration : Hour(shiftDuration) : shiftDuration)
 Shifts(timing::Timing, beginning::DateTime, shiftDuration::Int) = 
-  Shifts(timing, beginning, Hour(shiftDuration) : Hour(1) : Hour(shiftDuration))
+  Shifts(timing, beginning, Hour(shiftDuration) : Hour(shiftDuration) : Hour(shiftDuration)) # Start and stop must be multiples of step. 
 
 shiftBeginning(s::Shifts) = s.beginning
 shiftDurations(s::Shifts) = collect(s.durations)

@@ -7,7 +7,7 @@ struct TimingModel
   function TimingModel(m::Model, timing::Timing, shifts::Shifts)
     # Create the shift variables. 
     discretisation = shiftDurationsStep(shifts)
-    shiftOpen = @variable(m, [t=1:nShifts(Timing, shifts, discretisation)], Bin)
+    shiftOpen = @variable(m, [t=1:nShifts(timing, shifts, discretisation)], Bin)
     for t in 1:nShifts(Timing, shifts, discretisation)
       setname(so[t], "shiftOpen_$(t)") 
     end
@@ -39,9 +39,9 @@ eachTimeStep(hr::TimingModel; kwargs...) = eachTimeStep(timing(hr); kwargs...)
 # Link to the methods of Shifts. 
 shiftBeginning(hr::TimingModel) = shiftBeginning(shifts(hr))
 shiftDurations(hr::TimingModel) = shiftDurations(shifts(hr))
-shiftDurationsStart(s::Shifts) = shiftDurationsStart(shifts(hr))
-shiftDurationsStep(s::Shifts) = shiftDurationsStep(shifts(hr))
-shiftDurationsStop(s::Shifts) = shiftDurationsStop(shifts(hr))
+shiftDurationsStart(s::TimingModel) = shiftDurationsStart(shifts(hr))
+shiftDurationsStep(s::TimingModel) = shiftDurationsStep(shifts(hr))
+shiftDurationsStop(s::TimingModel) = shiftDurationsStop(shifts(hr))
 nShiftDurations(hr::TimingModel) = nShiftDurations(shifts(hr))
 shiftDuration(hr::TimingModel) = shiftDuration(shifts(hr))
 nShifts(hr::TimingModel) = nShifts(shifts(hr))

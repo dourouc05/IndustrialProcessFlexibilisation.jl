@@ -4,7 +4,7 @@ module IndustrialProcessFlexibilisation
   export Timing
   export timeBeginning, timeHorizon, timeStepDuration, timeEnding, nOccurrencesPerPeriod, nTimeSteps, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep
   export Shifts
-  export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, nTimeStepsPerShift, dateToShift, shift
+  export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, shiftDurationsStart, shiftDurationsStep, shiftDurationsStop, nTimeStepsPerShift, dateToShift, shift
   # Plant data structures (data/plant/)
   export ConsumptionModel, NoConsumption, ConstantConsumption, LinearConsumption, QuadraticConsumption, PiecewiseLinearConsumption,
          AbstractEquipment, Equipment, ImplicitEquipment, InImplicitEquipment, OutImplicitEquipment, inEquipment, outEquipment,

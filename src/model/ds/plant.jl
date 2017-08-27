@@ -160,10 +160,11 @@ eachTimeStep(pm::PlantModel; kwargs...) = eachTimeStep(timing(pm); kwargs...)
 
 # Link to the methods of Shifts. 
 shiftBeginning(pm::PlantModel) = shiftBeginning(shifts(pm))
+shiftDuration(pm::PlantModel) = shiftDuration(shifts(pm))
 shiftDurations(pm::PlantModel) = shiftDurations(shifts(pm))
 shiftDurationsStart(pm::PlantModel) = shiftDurationsStart(shifts(pm)) # TODO: TO TEST! 
-shiftDurationsStep(pm::PlantModel) = shiftDurations(shifStepts(pm)) # TODO: TO TEST! 
-shiftDurationsStop(pm::PlantModel) = shiftDurations(shifts(pStopm)) # TODO: TO TEST! 
+shiftDurationsStep(pm::PlantModel) = shiftDurationsStep(shifts(pm)) # TODO: TO TEST! 
+shiftDurationsStop(pm::PlantModel) = shiftDurationsStop(shifts(pm)) # TODO: TO TEST! 
 nShiftDurations(pm::PlantModel) = nShiftDurations(shifts(pm)) # TODO: TO TEST! 
 
 # Link to the methods of OrderBook.

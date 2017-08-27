@@ -29,8 +29,8 @@
 
       # The two previous test cases should not be affected by restrictToTiming, except for matrix size (some orders are
       # deleted from the order book before conversion with restrictToTiming, hence some products may be lost).
-      @test(convert(Array, ob, t1, shiftly=true, restrictToTiming=true) ≈ convert(Array, ob, t1, shiftly=true, restrictToTiming=false))
-      @test(convert(Array, ob, t2, shiftly=true, restrictToTiming=true) ≈ sum(convert(Array, ob, t2, shiftly=true, restrictToTiming=false), 2))
+      @test(convert(Array, ob, t1, s1, shiftly=true, restrictToTiming=true) ≈ convert(Array, ob, t1, s1, shiftly=true, restrictToTiming=false))
+      @test(convert(Array, ob, t2, s2, shiftly=true, restrictToTiming=true) ≈ sum(convert(Array, ob, t2, s2, shiftly=true, restrictToTiming=false), 2))
 
       # restrictToTiming has an effect on *past* orders.
       ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(timeBeginning(t1) - Week(1) => (p1, 50), timeBeginning(t1) + Week(1) => (p2, 50)))

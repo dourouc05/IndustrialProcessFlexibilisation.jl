@@ -13,13 +13,17 @@
         @test(timeHorizon(hrm) == timeHorizon(t))
         @test(timeEnding(hrm) == timeEnding(t))
         @test(timeStepDuration(hrm) == timeStepDuration(t))
-        @test(shiftBeginning(hrm) == shiftBeginning(t))
-        @test(shiftDuration(hrm) == shiftDuration(t))
+        @test(shiftBeginning(hrm) == shiftBeginning(s))
+        @test(shiftDuration(hrm) == shiftDuration(s))
+        @test(shiftDurations(hrm) == shiftDurations(s))
+        @test(shiftDurationsStart(hrm) == shiftDurationsStart(s))
+        @test(shiftDurationsStep(hrm) == shiftDurationsStep(s))
+        @test(shiftDurationsStop(hrm) == shiftDurationsStop(s))
 
         @test(nTimeSteps(hrm) == 48)
         @test(nTimeSteps(hrm, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
         @test(nTimeSteps(hrm, Day(1)) == 24)
-        @test(nTimeStepsPerShift(hrm) == 8)
+        @test(nTimeStepsPerShift(hrm) == [8]) # Only one shift length available, hence a singleton (but not a scalar).
         @test(nShifts(hrm) == 6)
 
         @test_throws(ErrorException, dateToTimeStep(hrm, date - Hour(1)))
@@ -1025,7 +1029,7 @@
         ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
         eo = EnergyObjective(ep_ts, t)
 
-        co = ObjectiveCombination([hro, eo], [.5, .75], [:hr, :en])
+        co = ObjectiveCombination([hro, eo], [.5, .75], symbols=[:hr, :en])
       end
     end
 
@@ -1050,7 +1054,7 @@
 
       date = DateTime(2017, 01, 01, 08)
       t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
-      s = Shitfs(shiftBeginning=date, Hour(8))
+      s = Shifts(t, date, Hour(8))
 
       m = Model(solver=CbcSolver(logLevel=0))
       pm = PlantModel(m, p, ob, t, s)

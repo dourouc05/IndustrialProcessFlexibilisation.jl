@@ -102,11 +102,11 @@ Computes the number of minimum-length shifts between `d` and the beginning of th
 the closest integer is returned.
 """
 function dateToShift(s::Shifts, d::DateTime)
-  if d < shiftBeginning(t)
-    error("Time " * string(d) * " before the shift beginning (" * string(shiftBeginning(t)) * ").")
+  if d < shiftBeginning(s)
+    error("Time " * string(d) * " before the shift beginning (" * string(shiftBeginning(s)) * ").")
   end
 
-  delta = Millisecond(d - shiftBeginning(t)).value
+  delta = Millisecond(d - shiftBeginning(s)).value
   return 1 + floor(Int, delta / Dates.toms(shiftDurationsStep(s))) 
 end
 

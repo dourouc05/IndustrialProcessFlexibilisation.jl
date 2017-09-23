@@ -16,7 +16,9 @@ Results from the production model. They are divided into three categories:
 
   * HR results: 
     * `shiftsOpenRaw`: whether a shift (with a discretisation corresponding to the step in the `Shifts` object) is worked
-    * `shiftsOpen`: indicates which shifts are worked, with realistic shift lengths ()
+    * `shiftsOpen`: indicates which shifts are worked, with realistic shift lengths. The first element of the tuple is the 
+      beginning of the shift, while the second is its length. The third element of the tuple gives the number of teams 
+      that are required for this shift
 
   * production results: 
     * `productionPlanOutput`: the production for each time step (first index) and each product (second index)
@@ -32,18 +34,18 @@ struct ProductionModelResults
   plantModel::PlantModel
 
   shiftsOpenRaw::Array{Bool, 1}
-  shiftsOpen::Array{Tuple{DateTime, Hour}, 1}
+  shiftsOpen::Array{Tuple{DateTime, Hour, Int}, 1} # TODO: make a specific data structure with dedicated operations? Would guarantee invariants as checked at the beginning of model/hr.jl:teamModel; other operations of this function would be simplified. Could make this data structure easier to evolve (two full teams are probably not needed if two machines are to be operated, depending on the plant). 
 
   productionPlanOutput::Array{Float64, 2}
 
   # Infeasible constructor. 
   function ProductionModelResults(model::Model, plantModel::PlantModel)
-    return new(false, model, plantModel, Bool[], BULLSHIT, Float64[])
+    return new(false, model, plantModel, Bool[], Tuple{DateTime, Hour}[], Float64[])
   end
 
   # Feasible constructor
   function ProductionModelResults(model::Model, plantModel::PlantModel, shiftsOpenRaw::Array{Bool, 1}, productionPlanOutput::Array{Float64, 2})
-    return new(false, model, plantModel, shiftsOpenRaw, shiftsAgregation(shiftsOpenRaw, shifts(plantModel)), productionPlanOutput)
+    return new(true, model, plantModel, shiftsOpenRaw, shiftsAgregation(shiftsOpenRaw, shifts(plantModel)), productionPlanOutput)
   end
 end
 

@@ -3,7 +3,7 @@ Agregates small, atomic shifts as longer shifts, based on the allowed shift leng
 """
 function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts::Shifts, solver::MathProgBase.AbstractMathProgSolver)
   # First extract long worked periods, not yet dealing with maximum shift duration. 
-  shiftsOpenLong = Tuple{DateTime, Hour}[]
+  shiftsOpenLong = Tuple{DateTime, Hour, Int}[]
 
   start = timeBeginning(timing)
   duration = 0
@@ -47,7 +47,7 @@ function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts:
       start = sol[1]
       for i in nShiftDurations(shifts)
         for repetition in 1:getvalue(n[i])
-          push!(shiftsOpen, (start, shiftDurations(shifts)[i]))
+          push!(shiftsOpen, (start, shiftDurations(shifts)[i], 1))
           start += shiftDurations(shifts)[i]
         end
       end

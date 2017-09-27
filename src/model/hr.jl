@@ -52,6 +52,9 @@ function teamModel(neededTeamsForShifts::Array{Tuple{DateTime, Hour, Int}, 1}, t
     warn("Optimisation horizon not long enough to implement a days-off constraint: only " * string(nDays) * " days, while the constraint works with horizons of " * string(consecutiveDaysOff[2]) * " days.")
   end
 
+  # If fixed schedule, then all shifts have a given length. 
+  # TODO: get a PlantModel or something here to check this hypothesis! 
+
   ## Derived data from inputs.
   # Tables of correspondance between shifts and some periods of time.
   encodeDay(dt::DateTime) = 10_000 * year(dt) + 100 * month(dt) + day(dt)

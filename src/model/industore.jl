@@ -274,11 +274,10 @@ function findCycles(solution::Array{Char, 2}) # TODO: To test!
   return cycles
 end
 
-function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionObjective,
-                       canWorkDays::BitArray{1}, canWorkNights::BitArray{1},
+function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, obj::ProductionObjective,
                        priorNoticeDelay::Int, notificationFrequency::Int, completeHorizon::Int, optimisationHorizonForOrderBook::Int, optimisationHorizonForHR::Int, hoursPerShift::Int,
                        timeBetweenShifts::Int, consecutiveDaysOff::Tuple{Int, Int}, maxHoursPerWeek::Int, hoursContract::Tuple{Int, Int},
-                       coeffs::Tuple{Float64, Float64, Float64, Float64, Float64}, hrAlgo::Symbol,
+                       coeffs::Tuple{Float64, Float64, Float64, Float64, Float64, Float64}, hrAlgo::Symbol, nTeams::Int,
                        solver;
                        outFolder::AbstractString="./")
   # TODO: Find a better name for optimisationHorizonForHR (not really an optimisation horizon, as a larger horizon is computed, but only this part is communicated to the workers).
@@ -369,10 +368,6 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
     error("The solution must be computed at least as often (notificationFrequency = " * string(notificationFrequency) * ") as the notification are done (priorNoticeDelay = " * string(priorNoticeDelay) * "). ")
   end
 
-  if length(canWorkDays) != length(canWorkNights)
-    error("The arrays canWorkDays and canWorkNights do not have the same size (canWorkDays: " * string(length(canWorkDays)) * "; canWorkNights: " * string(length(canWorkNights)) * ").")
-  end
-
   if optimisationHorizonForOrderBook < optimisationHorizonForHR
     error("The optimisation horizon for the production part (optimisationHorizonForOrderBook = " * string(optimisationHorizonForOrderBook) * ") is smaller than that of HR (optimisationHorizonForHR = " * string(optimisationHorizonForHR) * ").")
   end
@@ -384,8 +379,7 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
   end
 
   ## Compute the basic global parameters.
-  nTeams = length(canWorkDays)
-  shiftsPerDay = round(Int, 24 / hoursPerShift)
+  shiftsPerDay = round(Int, 24 / hoursPerShift) # TODO: TO REMOVE! No more makes sense. 
 
   # The first iteration provides the solution for `priorNoticeDelay` days.
   # Each subsequent iteration provides the solution for `notificationFrequency` days.
@@ -393,8 +387,7 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
   #     completeHorizon = priorNoticeDelay + (I - 1) * notificationFrequency
   # The following formula is obtained by solving this equation for I.
   nIterations = ceil(Int, (completeHorizon - priorNoticeDelay) / notificationFrequency) + 1
-  wholeTiming = Timing(timeBeginning=timeBeginning(timing), timeHorizon=Day(completeHorizon), timeStepDuration=timeStepDuration(timing),
-                       shiftDuration=shiftDuration(timing), shiftBeginning=shiftBeginning(timing))
+  wholeTiming = Timing(timeBeginning=timeBeginning(timing), timeHorizon=Day(completeHorizon), timeStepDuration=timeStepDuration(timing))
 
   # Write it down.
   h5open(outFile, "w") do f
@@ -427,7 +420,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
   end
 
   ## Prepare to store the results of all iterations.
-  productionModels = Model[]
+  productionResults = ProductionModelResults[]
+  hrResults = HRModelResults[]
+
   solutions = BitArray{2}[]
   committedSolutions = BitArray{2}[]
   communicatedSolutions = BitArray{2}[]
@@ -463,20 +458,21 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
     # Compute the HR requirements with a production model.
     println(" --------------- Production model ------------------------------------------------------------------------ ")
     if i == 1 # No initial solution to respect.
-      status, pm, mP, shifts, iterationQuantities = productionModel(p, ob, nt, nobj, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
+      pr = productionModel(p, ob, nt, shifts, nobj, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
     else # Has already something that is produced
-      status, pm, mP, shifts, iterationQuantities = productionModel(p, ob, nt, nobj, alreadyProduced=producedQuantities[i - 1], forcedShifts=vec(sum(solutions[i - 1][:, (1 + notificationFrequency * shiftsPerDay) : (priorNoticeDelay * shiftsPerDay)], 1)), outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
+      pr = productionModel(p, ob, nt, shifts, nobj, alreadyProduced=producedQuantities[i - 1], forcedShifts=vec(sum(solutions[i - 1][:, (1 + notificationFrequency * shiftsPerDay) : (priorNoticeDelay * shiftsPerDay)], 1)), outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
     end
+    push!(productionResults, pr)
     shifts = convert(Array{Int, 1}, shifts)
 
-    if ! status
+    if ! pr.feasibility
       println(" --------------- Production model infeasible! ---------------------------------------------------------- ")
-      return status, :Production
+      return false, :Production
     else
       println(" --------------- Production model objective: $(getobjectivevalue(mP)) -------------------------------------------------- ")
     end
 
-    iterationQuantities = vec(sum(iterationQuantities[1:nTimeSteps(timing, Day(priorNoticeDelay)), :], 1))
+    iterationQuantities = vec(sum(pr.productionPlanOutput[1:nTimeSteps(timing, Day(priorNoticeDelay)), :], 1))
 
     ## Optimisation: HR.
     # Now try to make the teams. Distinction based on the number of iterations performed: if this is the first
@@ -489,14 +485,13 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       # These bounds are used for all the teams.
 
       ## Perform team assignment.
-      status, mH, s, sl, sm, hrObj, hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair =
-        teamModel(shifts, hoursPerShift, timeBetweenShifts,
-                  consecutiveDaysOff, maxHoursPerWeek, boundsHours,
-                  canWorkDays, canWorkNights, coeffs,
-                  (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
-                  outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
+      hrr = teamModel(pr.shiftsOpen, hoursPerShift, timeBetweenShifts,
+                      consecutiveDaysOff, maxHoursPerWeek, boundsHours,
+                      nTeams, coeffs,
+                      (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
+                      outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
 
-      if ! status
+      if ! hrr.feasibility
         println(" --------------- HR model infeasible! ---------------------------------------------------------------- ")
         return false, :HR
       else
@@ -547,9 +542,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
 
       ## Perform team assignment.
       status, mH, s, sl, sm, hrObj, hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair =
-        teamModel(shifts, hoursPerShift, timeBetweenShifts,
+        teamModel(shifts, timeBetweenShifts,
                   consecutiveDaysOff, maxHoursPerWeek, boundsHours,
-                  canWorkDays, canWorkNights, coeffs, (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
+                  nTeams, coeffs, (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
                   solutions[i - 1][:, 1 + notificationFrequency * shiftsPerDay : end], :forceThenHint,
                   outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
 
@@ -571,7 +566,6 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
 
     ## Fill internal data structures.
     # Raw solution in internal data structures.
-    push!(productionModels, mP)
     push!(solutions, round.(Bool, round.(Int, s)))
     push!(shiftsLess, round.(Bool, round.(Int, sl)))
     push!(shiftsMore, round.(Bool, round.(Int, sm)))

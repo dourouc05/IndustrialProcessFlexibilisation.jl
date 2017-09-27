@@ -44,8 +44,8 @@ struct ProductionModelResults
   end
 
   # Feasible constructor
-  function ProductionModelResults(model::Model, plantModel::PlantModel, shiftsOpenRaw::Array{Bool, 1}, productionPlanOutput::Array{Float64, 2})
-    return new(true, model, plantModel, shiftsOpenRaw, shiftsAgregation(shiftsOpenRaw, shifts(plantModel)), productionPlanOutput)
+  function ProductionModelResults(model::Model, plantModel::PlantModel, shiftsOpenRaw::Array{Bool, 1}, shiftsOpen::Array{Tuple{DateTime, Hour, Int}, 1}, productionPlanOutput::Array{Float64, 2})
+    return new(true, model, plantModel, shiftsOpenRaw, shiftsOpen, productionPlanOutput)
   end
 end
 

@@ -652,43 +652,46 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
 
       ## HR: perform a few analyses (just this iteration).
       # This only applies when shifts follow predictable patterns, i.e. not when they are being optimised! 
-      shiftsBool = round.(Bool, round.(Int, solutions[i]))
-      letters = shiftsAsLetters(shiftsBool, firstDay=timeBeginning(nt))
-      lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
-      # cycles = findCycles(letters)
-      # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
+      # Most analyses require three shifts a day, i.e. 8-hour shifts. 
+      if nShiftDurations(shifts) == 1 && shiftDuration(shift) == Hour(8)
+        shiftsBool = round.(Bool, round.(Int, solutions[i]))
+        letters = shiftsAsLetters(shiftsBool, firstDay=timeBeginning(nt))
+        lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
+        # cycles = findCycles(letters)
+        # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
 
-      write(f, "it" * string(i) * "/analysis/hr/shiftsAsLetters", lettersSerialisable)
-      # write(f, "it" * string(i) * "/analysis/hr/cycles", cycles) # Cycles are no more used.
+        write(f, "it" * string(i) * "/analysis/hr/shiftsAsLetters", lettersSerialisable)
+        # write(f, "it" * string(i) * "/analysis/hr/cycles", cycles) # Cycles are no more used.
 
-      write(f, "it" * string(i) * "/analysis/ucl/SYNT", lettersSerialisable)
+        write(f, "it" * string(i) * "/analysis/ucl/SYNT", lettersSerialisable)
 
-      write(f, "it" * string(i) * "/analysis/ucl/nShifts", countShifts(letters, 'w'))
-      write(f, "it" * string(i) * "/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
+        write(f, "it" * string(i) * "/analysis/ucl/nShifts", countShifts(letters, 'w'))
+        write(f, "it" * string(i) * "/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
 
-      for l1 in "MANR"
-        write(f, "it" * string(i) * "/analysis/ucl/n$(l1)", countShifts(letters, l1))
-        write(f, "it" * string(i) * "/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
-        for l2 in "MANR"
-          write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
-          for l3 in "MANR"
-            write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+        for l1 in "MANR"
+          write(f, "it" * string(i) * "/analysis/ucl/n$(l1)", countShifts(letters, l1))
+          write(f, "it" * string(i) * "/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
+          for l2 in "MANR"
+            write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
+            for l3 in "MANR"
+              write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+            end
           end
         end
-      end
 
-      write(f, "it" * string(i) * "/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
-      # write(f, "it" * string(i) * "/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
-      # write(f, "it" * string(i) * "/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
+        write(f, "it" * string(i) * "/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
+        # write(f, "it" * string(i) * "/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
+        # write(f, "it" * string(i) * "/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
 
-      if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
-        hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
-        write(f, "it" * string(i) * "/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt))
-        write(f, "it" * string(i) * "/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2))
+        if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
+          hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
+          write(f, "it" * string(i) * "/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt))
+          write(f, "it" * string(i) * "/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2))
 
-        PAYm = sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2) ./ (8 * countShifts(letters, 'w'))
-        PAYm[isnan.(PAYm)] = 0.
-        write(f, "it" * string(i) * "/analysis/ucl/PAYm", PAYm)
+          PAYm = sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2) ./ (8 * countShifts(letters, 'w'))
+          PAYm[isnan.(PAYm)] = 0.
+          write(f, "it" * string(i) * "/analysis/ucl/PAYm", PAYm)
+        end
       end
     end
   end
@@ -753,44 +756,48 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       end
 
       # Perform a few analyses and write the results down.
-      letters = shiftsAsLetters(solution, firstDay=timeBeginning(timing))
-      lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
-      # cycles = findCycles(letters)
-      # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
+      # This only applies when shifts follow predictable patterns, i.e. not when they are being optimised! 
+      # Most analyses require three shifts a day, i.e. 8-hour shifts. 
+      if nShiftDurations(shifts) == 1 && shiftDuration(shift) == Hour(8)
+        letters = shiftsAsLetters(solution, firstDay=timeBeginning(timing))
+        lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
+        # cycles = findCycles(letters)
+        # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
 
-      write(f, "results/hr/shifts", round.(Int, solution))
+        write(f, "results/hr/shifts", round.(Int, solution))
 
-      write(f, "results/analysis/hr/shiftsAsLetters", lettersSerialisable)
-      # write(f, "results/analysis/hr/cycles", cycles) # Cycles are no more used.
+        write(f, "results/analysis/hr/shiftsAsLetters", lettersSerialisable)
+        # write(f, "results/analysis/hr/cycles", cycles) # Cycles are no more used.
 
-      write(f, "results/analysis/ucl/SYNT", lettersSerialisable)
+        write(f, "results/analysis/ucl/SYNT", lettersSerialisable)
 
-      write(f, "results/analysis/ucl/nShifts", countShifts(letters, 'w'))
-      write(f, "results/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
+        write(f, "results/analysis/ucl/nShifts", countShifts(letters, 'w'))
+        write(f, "results/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
 
-      for l1 in "MANR"
-        write(f, "results/analysis/ucl/n$(l1)", countShifts(letters, l1))
-        write(f, "results/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
-        for l2 in "MANR"
-          write(f, "results/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
-          for l3 in "MANR"
-            write(f, "results/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+        for l1 in "MANR"
+          write(f, "results/analysis/ucl/n$(l1)", countShifts(letters, l1))
+          write(f, "results/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
+          for l2 in "MANR"
+            write(f, "results/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
+            for l3 in "MANR"
+              write(f, "results/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+            end
           end
         end
-      end
 
-      write(f, "results/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
-      # write(f, "results/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
-      # write(f, "results/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
+        write(f, "results/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
+        # write(f, "results/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
+        # write(f, "results/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
 
-      if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
-        hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
-        write(f, "results/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(timing), solution, timing))
-        write(f, "results/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2))
+        if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
+          hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
+          write(f, "results/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(timing), solution, timing))
+          write(f, "results/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2))
 
-        PAYm = sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2) ./ (8 * countShifts(letters, 'w'))
-        PAYm[isnan.(PAYm)] = 0.
-        write(f, "results/analysis/ucl/PAYm", PAYm)
+          PAYm = sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2) ./ (8 * countShifts(letters, 'w'))
+          PAYm[isnan.(PAYm)] = 0.
+          write(f, "results/analysis/ucl/PAYm", PAYm)
+        end
       end
     end
   end

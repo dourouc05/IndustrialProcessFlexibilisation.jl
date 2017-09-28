@@ -3,7 +3,7 @@ struct HRModelResults
   model::Model
   # TODO: HRModel data structure
 
-  teamAssignment::Array{Bool, 2}
+  teamAssignment::Array{Bool, 2} # First index: team. Second index: shift (to be correlated with a ProductionModelResults object, namely its shiftsOpen property). 
 
   objective::Float64
   objectiveDifferenceInitialSolution::Float64

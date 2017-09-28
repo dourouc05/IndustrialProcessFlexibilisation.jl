@@ -455,15 +455,22 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
     end
 
     ## Optimisation: production.
+    # Set of shift indices that should carry over from previous iteration (if any). 
+    forcedShiftsIndices = (i == 1) ? Int[] : filter(1:length(productionResults[i - 1].shiftsOpen)) do s
+      # Take the shifts that have not yet been worked (notificationFrequency) but that were still decided by the previous iteration (priorNoticeDelay). 
+      d = productionResults[i - 1].shiftsOpen[s][1]
+      return d >= timeBeginning(nt) + Day(notificationFrequency) && d <= timeBeginning(nt) + Day(priorNoticeDelay)
+    end
+
     # Compute the HR requirements with a production model.
     println(" --------------- Production model ------------------------------------------------------------------------ ")
     if i == 1 # No initial solution to respect.
       pr = productionModel(p, ob, nt, shifts, nobj, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
     else # Has already something that is produced
-      pr = productionModel(p, ob, nt, shifts, nobj, alreadyProduced=producedQuantities[i - 1], forcedShifts=vec(sum(solutions[i - 1][:, (1 + notificationFrequency * shiftsPerDay) : (priorNoticeDelay * shiftsPerDay)], 1)), outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
+      forcedShifts = vec(sum(solutions[i - 1][:, forcedShiftsIndices], 1))
+      pr = productionModel(p, ob, nt, shifts, nobj, alreadyProduced=producedQuantities[i - 1], forcedShifts=forcedShifts, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
     end
     push!(productionResults, pr)
-    shifts = convert(Array{Int, 1}, shifts)
 
     if ! pr.feasibility
       println(" --------------- Production model infeasible! ---------------------------------------------------------- ")
@@ -485,11 +492,12 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       # These bounds are used for all the teams.
 
       ## Perform team assignment.
-      hrr = teamModel(pr.shiftsOpen, hoursPerShift, timeBetweenShifts,
+      hrr = teamModel(pr.shiftsOpen, timeBetweenShifts,
                       consecutiveDaysOff, maxHoursPerWeek, boundsHours,
                       nTeams, coeffs,
                       (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
                       outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
+      push!(hrResults, hrr)
 
       if ! hrr.feasibility
         println(" --------------- HR model infeasible! ---------------------------------------------------------------- ")
@@ -499,10 +507,11 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       end
 
       ## Save some results from this iteration.
-      # priorNoticeDelay days worth of shifts, with shiftsPerDay shifts per day. Sum over the remaining shifts
-      # (i.e. second dimension).
-      workedHours[:, i] = hoursPerShift * sum(round.(Bool, round.(Int, s))[:, 1:priorNoticeDelay * shiftsPerDay], 2)
+      # Number of hours each time has worked during the shifts that are fixed in this iteration (i.e. priorNoticeDelay days).
+      # This variable is cumulative over the iterations.
+      workedHours[:, i] = sum(productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[:, s] for idx in 1:length(productionResults[i].shiftsOpen), 2)
 
+      # Quantity of each product made during this iteration.
       iterationQuantitiesDict = Dict{Product, Float64}(productFromId(ob, pid) => iterationQuantities[pid] for pid in 1:nProducts(ob))
       push!(producedQuantities, iterationQuantitiesDict)
     else # Use the previous iteration as an initial solution.
@@ -525,12 +534,7 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       end
 
       # No negative values are allowed.
-      if boundsH[1] <= 0.
-        boundsH[1] = 0.
-      end
-      if boundsH[2] <= 0.
-        boundsH[2] = 0.
-      end
+      boundsH[boundsH .<= 0] = 0.
 
       # The upper bound must be greater than or equal to the lower bound.
       if boundsH[2] <= boundsH[1]
@@ -541,14 +545,15 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       boundsHours = (boundsH[1], boundsH[2])
 
       ## Perform team assignment.
-      status, mH, s, sl, sm, hrObj, hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair =
-        teamModel(shifts, timeBetweenShifts,
-                  consecutiveDaysOff, maxHoursPerWeek, boundsHours,
-                  nTeams, coeffs, (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
-                  solutions[i - 1][:, 1 + notificationFrequency * shiftsPerDay : end], :forceThenHint,
-                  outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
+      hrr = teamModel(pr.shiftsOpen, timeBetweenShifts,
+                      consecutiveDaysOff, maxHoursPerWeek, boundsHours,
+                      nTeams, coeffs,
+                      (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
+                      solutions[i - 1][:, forcedShiftsIndices], :forceThenHint, 
+                      outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)>
+      push!(hrResults, hrr)
 
-      if ! status
+      if ! hrr.feasibility
         println(" --------------- HR model infeasible! ---------------------------------------------------------------- ")
         return false, :HR
       else
@@ -556,23 +561,26 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       end
 
       ## Save some results from this iteration.
-      # priorNoticeDelay days worth of shifts, with shiftsPerDay shifts per day. Sum over the remaining shifts
-      # (i.e. second dimension). This variable is cumulative over the iterations.
-      workedHours[:, i] = workedHours[:, i - 1] + hoursPerShift * sum(round.(Bool, round.(Int, s))[:, 1:priorNoticeDelay * shiftsPerDay], 2)
+      # Number of worked hours (details in the comment for i == 1). 
+      workedHours[:, i] = workedHours[:, i - 1] + sum(productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[:, s] for idx in 1:length(productionResults[i].shiftsOpen), 2)
 
+      # Quantity of each product made during this iteration.
       iterationQuantitiesDict = Dict{Product, Float64}(productFromId(ob, pid) => iterationQuantities[pid] + producedQuantities[i - 1][productFromId(ob, pid)] for pid in 1:nProducts(ob))
       push!(producedQuantities, iterationQuantitiesDict)
     end
 
     ## Fill internal data structures.
     # Raw solution in internal data structures.
-    push!(solutions, round.(Bool, round.(Int, s)))
-    push!(shiftsLess, round.(Bool, round.(Int, sl)))
-    push!(shiftsMore, round.(Bool, round.(Int, sm)))
+    push!(solutions, round.(Bool, round.(Int, hrResults[i].teamAssignment)))
+    push!(shiftsLess, round.(Bool, round.(Int, hrResults[i].objectiveDifferenceInitialSolutionLess)))
+    push!(shiftsMore, round.(Bool, round.(Int, hrResults[i].objectiveDifferenceInitialSolutionMore)))
 
     # Parts of the solution that make sense for the HR, internal data structures.
-    committedShifts = s[:, 1:priorNoticeDelay * shiftsPerDay]
-    communicatedEstimatedShifts = s[:, 1:optimisationHorizonForHR * shiftsPerDay]
+    committedIndices = filter((s) -> productionResults[i - 1].shiftsOpen[s][1] <= timeBeginning(nt) + Day(priorNoticeDelay), 1:length(productionResults[i].shiftsOpen)) # Take the shifts that have been decided by the current iteration (priorNoticeDelay). 
+    communicatedIndices = filter((s) -> productionResults[i - 1].shiftsOpen[s][1] <= timeBeginning(nt) + Day(optimisationHorizonForHR), 1:length(productionResults[i].shiftsOpen))
+
+    committedShifts = hrResults[i].teamAssignment[:, committedIndices]
+    communicatedEstimatedShifts = hrResults[i].teamAssignment[:, 1:communicatedIndices]
     push!(committedSolutions, round.(Bool, round.(Int, committedShifts)))
     push!(communicatedSolutions, round.(Bool, round.(Int, communicatedEstimatedShifts)))
 
@@ -612,10 +620,10 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       write(f, "it" * string(i) * "/hr/solutionTime", getsolvetime(mH))
 
       # Raw solution and differences with the previous iteration (if any).
-      write(f, "it" * string(i) * "/hr/global/shifts", round.(Int, s))
+      write(f, "it" * string(i) * "/hr/global/shifts", round.(Int, solutions[i]))
       if i > 1 # At the first iteration, there is no previous solution, so no difference to the previous solution.
-        write(f, "it" * string(i) * "/hr/global/shiftsMore", round.(Int, sm))
-        write(f, "it" * string(i) * "/hr/global/shiftsLess", round.(Int, sl))
+        write(f, "it" * string(i) * "/hr/global/shiftsMore", round.(Int, shiftsMore[i]))
+        write(f, "it" * string(i) * "/hr/global/shiftsLess", round.(Int, shiftsLess[i]))
       end
 
       # The bounds mechanism.
@@ -626,8 +634,8 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       write(f, "it" * string(i) * "/hr/communicated/committedShifts", committedShifts)
       write(f, "it" * string(i) * "/hr/communicated/estimatedShifts", communicatedEstimatedShifts)
       if i > 1 # At the first iteration, there is no previous solution, so no difference to the previous solution.
-        smi = round.(Int, sl[:, 1:optimisationHorizonForHR * shiftsPerDay])
-        sli = round.(Int, sm[:, 1:optimisationHorizonForHR * shiftsPerDay])
+        smi = round.(Int, shiftsMore[i][:, communicatedIndices])
+        sli = round.(Int, shiftsLess[i][:, communicatedIndices])
         write(f, "it" * string(i) * "/hr/communicated/shiftsMore", smi)
         write(f, "it" * string(i) * "/hr/communicated/shiftsLess", sli)
         write(f, "it" * string(i) * "/hr/communicated/numberShiftsMore", sum(smi, 2))
@@ -643,7 +651,8 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       write(f, "it" * string(i) * "/hr/objective/unfairness", hrUnfair)
 
       ## HR: perform a few analyses (just this iteration).
-      shiftsBool = round.(Bool, round.(Int, s))
+      # This only applies when shifts follow predictable patterns, i.e. not when they are being optimised! 
+      shiftsBool = round.(Bool, round.(Int, solutions[i]))
       letters = shiftsAsLetters(shiftsBool, firstDay=timeBeginning(nt))
       lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
       # cycles = findCycles(letters)
@@ -719,14 +728,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       write(f, "results/analysis/ucl/PAYm", read(f, "it1/analysis/ucl/PAYm"))
     else
       nDaysBetweenIterations = priorNoticeDelay - notificationFrequency
-      nShiftsBetweenIterations = nDaysBetweenIterations * shiftsPerDay
 
       # Gather the complete solutions (HR and costs) from the results of each iteration.
-      solution = BitArray{2}(nTeams, completeHorizon * 3) # completeHorizon in days.
-      solution[:, 1 : size(committedSolutions[1], 2)] = committedSolutions[1]
-      for i in 2:nIterations
-        solution[:, size(committedSolutions[1], 2) + (i - 2) * notificationFrequency * shiftsPerDay + 1 : size(committedSolutions[1], 2) + (i - 1) * notificationFrequency * shiftsPerDay] = committedSolutions[i][:, (end - notificationFrequency * shiftsPerDay + 1) : end]
-      end
+      solution = hcat(committedSolutions...)
 
       if length(dailyObjectives) >= 1
         objectiveNames = Array{String}(nObjectives(obj))

@@ -49,11 +49,11 @@ dateToShift(hr::TimingModel, d::DateTime) = dateToShift(shifts(hr), d)
 
 
 # Define the constraints.
-function postConstraints(m::Model, hr::TimingModel, forcedShifts::Array{Tuple{DateTime, Hour}, 1}=Tuple{DateTime, Hour}[])
+function postConstraints(m::Model, hr::TimingModel, forcedShifts::Array{Tuple{DateTime, Hour, Int}, 1}=Tuple{DateTime, Hour, Int}[])
   # No link between time steps and shifts: time steps are linked to shifts directly through indexing.
 
   # Some shifts have already been decided previously.
-  for s in 1:length(forcedShifts)
-    @constraint(m, shiftOpen(hr, s) == forcedShifts[s]) # TODO: Rewrite forcedShifts as a more common data structure for this (with DateTime rather than indices).
+  for tuple in 1:length(forcedShifts)
+    @constraint(m, shiftOpen(hr, tuple[1]) == 1) # TODO: Rewrite forcedShifts as a more common data structure for this (with DateTime rather than indices).
   end
 end

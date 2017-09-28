@@ -1,5 +1,11 @@
 """
 Agregates small, atomic shifts as longer shifts, based on the allowed shift lengths. 
+
+This function outputs a list of tuples, containing the following information about each shift: 
+
+  * the beginning of the shift (DateTime)
+  * the duration of the shift (Hour)
+  * the number of teams required for the shift (Int)
 """
 function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts::Shifts, solver::MathProgBase.AbstractMathProgSolver)
   # First extract long worked periods, not yet dealing with maximum shift duration. 
@@ -18,13 +24,13 @@ function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts:
       end
     elseif ! shiftsOpenRaw[i] && i > 1 && shiftsOpenRaw[i - 1]
       # This shift is not worked, but the previous was: this is the end of a shift. 
-      push!(shiftsOpenLong, (start, duration * shiftDurationsStep(shifts)))
+      push!(shiftsOpenLong, (start, duration * shiftDurationsStep(shifts), 1))
       duration = 0
     end
   end
 
   # Then, split the too long shifts into more acceptable shifts. 
-  shiftsOpen = Tuple{DateTime, Hour}[]
+  shiftsOpen = Tuple{DateTime, Hour, Int}[]
   maximumShiftDuration = maximumShiftDurations(shifts)
 
   for sol in shiftsOpenLong

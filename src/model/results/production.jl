@@ -48,4 +48,3 @@ struct ProductionModelResults
     return new(true, model, plantModel, shiftsOpenRaw, shiftsOpen, productionPlanOutput)
   end
 end
-

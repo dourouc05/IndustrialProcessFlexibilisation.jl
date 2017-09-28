@@ -1034,37 +1034,119 @@
     end
 
     @testset "Plant" begin
-      e1 = Equipment("EAF", :eaf)
-      e2 = Equipment("LF", :lf)
-      e3 = Equipment("CC", :cc)
-      le = [e1, e2, e3]
-      r1 = NormalRoute(e1, e2)
-      r2 = NormalRoute(e2, e3)
-      le = [e1, e2, e3]
-      lr = Route[r1, r2]
-      p = Plant(le, lr)
+      @testset "Base case" begin
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        e3 = Equipment("CC", :cc)
+        le = [e1, e2, e3]
+        r1 = NormalRoute(e1, e2)
+        r2 = NormalRoute(e2, e3)
+        le = [e1, e2, e3]
+        lr = Route[r1, r2]
+        p = Plant(le, lr)
 
-      c = ConstantConsumption(2.0)
-      e1 = Equipment("EAF", :eaf)
-      e2 = Equipment("LF", :lf)
-      e3 = Equipment("CC", :cc)
-      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
-      p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
-      ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
+        c = ConstantConsumption(2.0)
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        e3 = Equipment("CC", :cc)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+        p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+        ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 31) => (p2, 50.)))
 
-      date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
-      s = Shifts(t, date, Hour(8))
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      pm = PlantModel(m, p, ob, t, s)
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t, s)
 
-      # Basic accessors.
-      @test(timingModel(pm) == pm.hr)
-      @test(equipmentModels(pm) == pm.equipments)
-      @test(flowModels(pm) == pm.flows)
-      # @test(equipmentModel(pm, "EAF") == find()) TODO
-      # @test(flowModel(pm) == TODO
+        # Basic accessors.
+        @test plant(pm) == p
+        @test orderBook(pm) == ob
+        @test timing(pm) == t
+        @test shifts(pm) == s
+
+        @test timingModel(pm) == pm.hr
+        @test equipmentModels(pm) == pm.equipments
+        @test flowModels(pm) == pm.flows
+        @test orderBookModel(pm) == pm.ob
+        
+        @test nEquipments(pm) == 5 # 2 implicit, 3 normal
+
+        # Finding things. 
+        equips = collect(values(equipmentModels(pm)))
+        @test equipmentModel(pm, "EAF") == equips[find((e) -> name(e) == "EAF", equips)[1]]
+        @test equipmentModel(pm, "LF")  == equips[find((e) -> name(e) == "LF",  equips)[1]]
+        @test equipmentModel(pm, "CC")  == equips[find((e) -> name(e) == "CC",  equips)[1]]
+        @test_throws(ErrorException, equipmentModel(pm, "stuff"))
+
+        flows = collect(values(flowModels(pm)))
+        @test flowModel(pm, "EAF", "LF") == flows[find((f) -> name(origin(f)) == "EAF" && name(destination(f)) == "LF", flows)[1]]
+        @test flowModel(pm, "LF", "CC") == flows[find((f) -> name(origin(f)) == "LF" && name(destination(f)) == "CC", flows)[1]]
+        @test_throws(ErrorException, flowModel(pm, "EAF", "CC"))
+        @test_throws(ErrorException, flowModel(pm, "EAF", "stuff"))
+        @test flowModel(pm, ("EAF", "LF")) == flows[find((f) -> name(origin(f)) == "EAF" && name(destination(f)) == "LF", flows)[1]]
+        @test flowModel(pm, ("LF", "CC")) == flows[find((f) -> name(origin(f)) == "LF" && name(destination(f)) == "CC", flows)[1]]
+        @test_throws(ErrorException, flowModel(pm, ("EAF", "CC")))
+        @test_throws(ErrorException, flowModel(pm, ("EAF", "stuff")))
+
+        # Link to the methods of Timing. 
+        @test timeBeginning(pm) == timeBeginning(t)
+        @test timeHorizon(pm) == timeHorizon(t)
+        @test timeEnding(pm) == timeEnding(t)
+        @test timeStepDuration(pm) == timeStepDuration(t)
+
+        @test nTimeSteps(pm, Minute(15)) == nTimeSteps(t, Minute(15))
+        @test nTimeSteps(pm, Hour(1)) == nTimeSteps(t, Hour(1))
+        @test nTimeSteps(pm, Day(1)) == nTimeSteps(t, Day(1))
+        @test nTimeSteps(pm) == nTimeSteps(t)
+        @test_throws(ErrorException, dateToTimeStep(pm, date - Hour(1)))
+        @test dateToTimeStep(pm, date) == dateToTimeStep(t, date)
+        @test dateToTimeStep(pm, date + Hour(1)) == dateToTimeStep(t, date + Hour(1))
+
+        @test eachTimeStep(pm) == eachTimeStep(t)
+        @test eachTimeStep(pm, from=timeBeginning(t) + Day(3)) == eachTimeStep(t, from=timeBeginning(t) + Day(3))
+        @test eachTimeStep(pm, to=timeBeginning(t) + Day(3)) == eachTimeStep(t, to=timeBeginning(t) + Day(3))
+        @test eachTimeStep(pm, duration=Day(4)) == eachTimeStep(t, duration=Day(4))
+        @test_throws(ErrorException, eachTimeStep(pm, to=date, duration=date)) # Can't set both
+        @test_throws(ErrorException, eachTimeStep(pm, duration=date)) # Bad type for duration
+        @test_throws(ErrorException, eachTimeStep(pm, to=Hour(1))) # Bad type for to
+        @test_throws(ErrorException, eachTimeStep(pm, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+        @test_throws(ErrorException, eachTimeStep(pm, to=1)) # Invalid argument type.
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, to=date, duration=date)) # Can't set all parameters at once
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, duration=date)) # Bad type for duration
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, to=Hour(1))) # Bad type for to
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+        @test_throws(TypeError, eachTimeStep(pm, from=1)) # Invalid argument type.
+
+        # Link to the methods of Shifts. 
+        @test shiftBeginning(pm) == shiftBeginning(s)
+        @test shiftDuration(pm) == shiftDuration(s)
+        @test shiftDurations(pm) == shiftDurations(s)
+        @test shiftDurationsStart(pm) == shiftDurationsStart(s)
+        @test shiftDurationsStep(pm) == shiftDurationsStep(s)
+        @test shiftDurationsStop(pm) == shiftDurationsStop(s)
+        @test minimumShiftDurations(pm) == minimumShiftDurations(s)
+        @test maximumShiftDurations(pm) == maximumShiftDurations(s)
+        @test nShiftDurations(pm) == nShiftDurations(s)
+
+        # Link to the methods of OrderBook.
+        @test orderBookDetails(pm) == orderBook(ob)
+        @test dates(pm) == dates(ob)
+        @test products(pm) == products(ob)
+        @test nProducts(pm) == nProducts(ob)
+        @test dueBy(pm, DateTime(2016)) == dueBy(ob, DateTime(2016))
+        @test dueBy(pm, DateTime(2017)) == dueBy(ob, DateTime(2017))
+        @test dueBy(pm, DateTime(2018)) == dueBy(ob, DateTime(2018))
+        @test dueBy(pm, DateTime(2016), cumulative=false) == dueBy(ob, DateTime(2016), cumulative=false)
+        @test dueBy(pm, DateTime(2017), cumulative=false) == dueBy(ob, DateTime(2017), cumulative=false)
+        @test dueBy(pm, DateTime(2018), cumulative=false) == dueBy(ob, DateTime(2018), cumulative=false)
+        @test productIds(pm) == productIds(ob)
+        @test productId(pm, p1) == productId(ob, p1)
+        @test productId(pm, p2) == productId(ob, p2)
+        @test productFromId(pm, 1) == productFromId(ob, 1)
+        @test productFromId(pm, 2) == productFromId(ob, 2)
+      end
     end
   end
 

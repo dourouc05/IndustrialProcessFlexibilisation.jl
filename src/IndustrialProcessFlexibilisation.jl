@@ -4,7 +4,7 @@ module IndustrialProcessFlexibilisation
   export Timing
   export timeBeginning, timeHorizon, timeStepDuration, timeEnding, nOccurrencesPerPeriod, nTimeSteps, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep
   export Shifts
-  export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, shiftDurationsStart, shiftDurationsStep, shiftDurationsStop, nTimeStepsPerShift, dateToShift, shift
+  export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, shiftDurationsStart, shiftDurationsStep, shiftDurationsStop, minimumShiftDurations, maximumShiftDurations, nTimeStepsPerShift, dateToShift, shift
   # Plant data structures (data/plant/)
   export ConsumptionModel, NoConsumption, ConstantConsumption, LinearConsumption, QuadraticConsumption, PiecewiseLinearConsumption,
          AbstractEquipment, Equipment, ImplicitEquipment, InImplicitEquipment, OutImplicitEquipment, inEquipment, outEquipment,
@@ -35,13 +35,13 @@ module IndustrialProcessFlexibilisation
   export equipment, quantity, flowIn, flowOut, on, off, start, stop, currentProduct, checkDate, productId,
          origin, destination, timing, orderBook, minimumValue, maximumValue, orderBookDetails,
          objectiveTimeStep, objectiveShift, objective, objectives, symbols, weights, weight, nObjectives, objectiveObject, objective, symbol, weight, nonzeroObjectives, hasObjective, electricityPrice, hrPrice,
-         timing, shiftOpen, shiftOpen, timeStepOpen,
+         timing, shifts, shiftOpen, shiftOpen, timeStepOpen,
          plant, timingModel, equipmentModels, flowModels, orderBookModel, equipmentModel, flowModel, nEquipments
 
 
 
   ## Exports for IO (io/).
-  # Only adding methods to Base functions.
+  # Only adding methods to Base functions, explicitly imported below.
 
   ## Exports for utilities (utils/).
   export smooth, changeVolatility

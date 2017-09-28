@@ -131,21 +131,21 @@ struct PlantModel
 end
 
 # Basic accessors for sub-objects.
-plant(pm::PlantModel) = pm.plant # TODO: To test!
-orderBook(pm::PlantModel) = pm.orderBook # TODO: To test!
-timing(pm::PlantModel) = pm.timing # TODO: To test!
-shifts(pm::PlantModel) = pm.shifts # TODO: To test!
+plant(pm::PlantModel) = pm.plant 
+orderBook(pm::PlantModel) = pm.orderBook 
+timing(pm::PlantModel) = pm.timing 
+shifts(pm::PlantModel) = pm.shifts 
 
 timingModel(pm::PlantModel) = pm.hr
 equipmentModels(pm::PlantModel) = pm.equipments
 flowModels(pm::PlantModel) = pm.flows
 orderBookModel(pm::PlantModel) = pm.ob
 
-equipmentModel(pm::PlantModel, e::AbstractString) = pm.equipments[e]
-flowModel(pm::PlantModel, f::Tuple{AbstractString, AbstractString}) = pm.flows[f]
-flowModel(pm::PlantModel, o::AbstractString, d::AbstractString) = pm.flows[(o, d)]
+equipmentModel(pm::PlantModel, e::AbstractString) = try pm.equipments[e]; catch; error("Equipment $(e) not found"); end
+flowModel(pm::PlantModel, f::Tuple{AbstractString, AbstractString}) = try pm.flows[f]; catch; error("Flow between $(f[1]) and $(f[2]) not found"); end
+flowModel(pm::PlantModel, o::AbstractString, d::AbstractString) = try pm.flows[(o, d)]; catch; error("Flow between $(o) and $(d) not found"); end
 
-nEquipments(pm::PlantModel) = length(equipments(pm))
+nEquipments(pm::PlantModel) = length(equipmentModels(pm))
 
 # Link to the methods of Timing.
 timeBeginning(pm::PlantModel) = timeBeginning(timing(pm))
@@ -162,13 +162,20 @@ eachTimeStep(pm::PlantModel; kwargs...) = eachTimeStep(timing(pm); kwargs...)
 shiftBeginning(pm::PlantModel) = shiftBeginning(shifts(pm))
 shiftDuration(pm::PlantModel) = shiftDuration(shifts(pm))
 shiftDurations(pm::PlantModel) = shiftDurations(shifts(pm))
-shiftDurationsStart(pm::PlantModel) = shiftDurationsStart(shifts(pm)) # TODO: TO TEST! 
-shiftDurationsStep(pm::PlantModel) = shiftDurationsStep(shifts(pm)) # TODO: TO TEST! 
-shiftDurationsStop(pm::PlantModel) = shiftDurationsStop(shifts(pm)) # TODO: TO TEST! 
-nShiftDurations(pm::PlantModel) = nShiftDurations(shifts(pm)) # TODO: TO TEST! 
+shiftDurationsStart(pm::PlantModel) = shiftDurationsStart(shifts(pm)) 
+shiftDurationsStep(pm::PlantModel) = shiftDurationsStep(shifts(pm)) 
+shiftDurationsStop(pm::PlantModel) = shiftDurationsStop(shifts(pm)) 
+minimumShiftDurations(pm::PlantModel) = minimumShiftDurations(shifts(pm))
+maximumShiftDurations(pm::PlantModel) = maximumShiftDurations(shifts(pm))
+nShiftDurations(pm::PlantModel) = nShiftDurations(shifts(pm)) 
 
 # Link to the methods of OrderBook.
 orderBookDetails(pm::PlantModel) = orderBook(orderBook(pm))
 dates(pm::PlantModel) = dates(orderBook(pm))
 products(pm::PlantModel) = products(orderBook(pm))
 nProducts(pm::PlantModel) = nProducts(orderBook(pm))
+dueBy(pm::PlantModel, dt::DateTime; kwargs...) = dueBy(orderBook(pm), dt; kwargs...)
+fromto(pm::PlantModel, from::DateTime, to::DateTime) = fromto(orderBook(pm), from, to)
+productIds(pm::PlantModel) = productIds(orderBook(pm))
+productId(pm::PlantModel, p::Product) = productId(orderBook(pm), p)
+productFromId(pm::PlantModel, i::Int) = productFromId(orderBook(pm), i)

@@ -509,7 +509,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
       ## Save some results from this iteration.
       # Number of hours each time has worked during the shifts that are fixed in this iteration (i.e. priorNoticeDelay days).
       # This variable is cumulative over the iterations.
-      workedHours[:, i] = sum(productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[:, s] for idx in 1:length(productionResults[i].shiftsOpen), 2)
+      for team in 1:nTeams
+        workedHours[team, i] = sum([productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[team, s] for s in 1:length(productionResults[i].shiftsOpen)])
+      end
 
       # Quantity of each product made during this iteration.
       iterationQuantitiesDict = Dict{Product, Float64}(productFromId(ob, pid) => iterationQuantities[pid] for pid in 1:nProducts(ob))
@@ -562,7 +564,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, 
 
       ## Save some results from this iteration.
       # Number of worked hours (details in the comment for i == 1). 
-      workedHours[:, i] = workedHours[:, i - 1] + sum(productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[:, s] for idx in 1:length(productionResults[i].shiftsOpen), 2)
+      for team in 1:nTeams
+        workedHours[team, i] = workedHours[team, i - 1] + sum([productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[team, s] for s in 1:length(productionResults[i].shiftsOpen)])
+      end
 
       # Quantity of each product made during this iteration.
       iterationQuantitiesDict = Dict{Product, Float64}(productFromId(ob, pid) => iterationQuantities[pid] + producedQuantities[i - 1][productFromId(ob, pid)] for pid in 1:nProducts(ob))

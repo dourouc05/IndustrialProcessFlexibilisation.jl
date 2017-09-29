@@ -42,11 +42,9 @@ function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts:
       # After all, it's a figth-generation programming language! 
       m = Model(solver=solver)
       @variable(m, n[1:nShiftDurations(shifts)] >= 0, Int)
-      @variable(m, average >= 0)
-      @variable(m, slackPlus[1:nShiftDurations(shifts)] >= 0)
-      @variable(m, slackMinus[1:nShiftDurations(shifts)] >= 0)
+      @variable(m, slack[1:nShiftDurations(shifts)] >= 0)
       @constraint(m, dot(n, map(d -> d.value, shiftDurations(shifts))) == sol[2].value)
-      @constraint(m, c[i=1:nShiftDurations(shifts)], n[i] * shiftDurations(shifts)[i].value + slackPlus[i] - slackMinus[i] == average)
+      @constraint(m, c[i=1:nShiftDurations(shifts)], n[i] * shiftDurations(shifts)[i].value + slack[i] == maximumShiftDurations(shifts))
       @objective(m, Min, sum(slackPlus) + sum(slackMinus) + 10 * sum(n))
       solve(m)
 

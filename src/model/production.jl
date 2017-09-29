@@ -1,7 +1,7 @@
 function productionModel(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, obj::ProductionObjective;
                          solver::MathProgBase.AbstractMathProgSolver=JuMP.UnsetSolver(), outfile="",
                          alreadyProduced::Dict{Product, Float64}=Dict{Product, Float64}(),
-                         forcedShifts::Array{Int, 1}=zeros(Int, 0)) # TODO: make the argument forcedShifts use a more decent API (i.e. DateTime-based).
+                         forcedShifts::Array{Tuple{DateTime, Hour, Int}, 1}=Tuple{DateTime, Hour, Int}[]) 
   ## Variables.
   m = Model(solver=solver)
   pm = PlantModel(m, p, ob, timing, shifts)
@@ -27,6 +27,9 @@ function productionModel(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts
   if status != :Infeasible && status != :Unbounded && status != :Error
     shiftsOpen = [round(Bool, round(Int, getvalue(shiftOpen(timingModel(pm), d)))) for d in timeBeginning(pm) : shiftDurationsStep(pm) : timeEnding(pm)] 
     productionRaw = getvalue(quantity(equipmentModel(pm, "out"))) # TODO: In PlantModel, link to the variables of each subobject model? Define quantity() and others on the plant model? Or just a subset?
+    println("=========")
+    println(shiftsOpen)
+    println("=========")
     return ProductionModelResults(m, pm, shiftsOpen, shiftsAgregation(shiftsOpen, timing, shifts, solver), productionRaw)
   else
     if length(outfile) > 0

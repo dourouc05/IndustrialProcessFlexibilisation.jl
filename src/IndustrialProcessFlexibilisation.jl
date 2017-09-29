@@ -45,6 +45,7 @@ module IndustrialProcessFlexibilisation
 
   ## Exports for utilities (utils/).
   export smooth, changeVolatility
+  export shiftsAgregation
 
   using Base.Iterators
   using Base.Dates

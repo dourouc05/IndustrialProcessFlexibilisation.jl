@@ -43,4 +43,127 @@
     @test(values(electricityPrice(smooth(eo, 3, 3, 8))) == values(smooth(ep, 3, 3, 8)))
     @test(values(electricityPrice(changeVolatility(eo, 1.15))) == values(changeVolatility(ep, 1.15)))
   end
+
+  @testset "Shift agregation" begin
+    @testset "No flexibility" begin
+      date = DateTime(2017, 01, 01, 08)
+      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+      s = Shifts(t, date, Hour(8))
+      solver = CbcSolver(logLevel=0)
+
+      # No shift shall be output. 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 0
+      
+      # Only one shift (tenth index). 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 1
+      @test agregated[1][1] == date + Hour(8 * (10 - 1))
+      @test agregated[1][2] == Hour(8)
+      @test agregated[1][3] == 1
+      
+      # Two consecutive shifts: both are longer than the maximum allowed shift length (which is fixed). 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 2
+      @test agregated[1][1] == date + Hour(8 * (10 - 1))
+      @test agregated[1][2] == Hour(8)
+      @test agregated[1][3] == 1
+      @test agregated[2][1] == date + Hour(8 * (11 - 1))
+      @test agregated[2][2] == Hour(8)
+      @test agregated[2][3] == 1
+      
+      # Three shifts.  
+      shifts = Bool[false, false, true, false, false, false, false, false, false, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 3
+      @test agregated[1][1] == date + Hour(8 * (3 - 1))
+      @test agregated[1][2] == Hour(8)
+      @test agregated[1][3] == 1
+      @test agregated[2][1] == date + Hour(8 * (10 - 1))
+      @test agregated[2][2] == Hour(8)
+      @test agregated[2][3] == 1
+      @test agregated[3][1] == date + Hour(8 * (11 - 1))
+      @test agregated[3][2] == Hour(8)
+      @test agregated[3][3] == 1
+    end
+
+    @testset "HR flexibility" begin
+      date = DateTime(2017, 01, 01, 08)
+      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+      s = Shifts(t, date, Hour(2) : Hour(2) : Hour(8))
+      solver = CbcSolver(logLevel=0)
+
+      # No shift shall be output. 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 0
+      
+      # One single shift (tenth index). Minimum shift length! 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 1
+      @test agregated[1][1] == date + Hour(2 * (10 - 1))
+      @test agregated[1][2] == Hour(2)
+      @test agregated[1][3] == 1
+      
+      # Two consecutive shifts (starting at tenth index). 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 1
+      @test agregated[1][1] == date + Hour(2 * (10 - 1))
+      @test agregated[1][2] == Hour(4)
+      @test agregated[1][3] == 1
+      
+      # Three consecutive shifts (starting at tenth index). 
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 1
+      @test agregated[1][1] == date + Hour(2 * (10 - 1))
+      @test agregated[1][2] == Hour(6)
+      @test agregated[1][3] == 1
+      
+      # Four consecutive shifts (starting at tenth index). Maximum shift length!
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 1
+      @test agregated[1][1] == date + Hour(2 * (10 - 1))
+      @test agregated[1][2] == Hour(8)
+      @test agregated[1][3] == 1
+      
+      # Five consecutive shifts (starting at tenth index). Over the maximum shift length.
+      # Two acceptable scenarios: first 4h then 6h or the reverse (in order to minimise the differences between the shifts, base axiom of shiftsAgregation).
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 2
+      if agregated[1][2] == Hour(4)
+        @test agregated[1][1] == date + Hour(2 * (10 - 1))
+        @test agregated[1][2] == Hour(4)
+        @test agregated[1][3] == 1
+        @test agregated[2][1] == date + Hour(2 * (10 - 1) + 4)
+        @test agregated[2][2] == Hour(6)
+        @test agregated[2][3] == 1
+      else
+        @test agregated[1][1] == date + Hour(2 * (10 - 1))
+        @test agregated[1][2] == Hour(6)
+        @test agregated[1][3] == 1
+        @test agregated[2][1] == date + Hour(2 * (10 - 1) + 6)
+        @test agregated[2][2] == Hour(4)
+        @test agregated[2][3] == 1
+      end
+      
+      # Six consecutive shifts (starting at tenth index). Over the maximum shift length.
+      shifts = Bool[false, false, false, false, false, false, false, false, false, true, true, true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+      agregated = shiftsAgregation(shifts, t, s, solver)
+      @test length(agregated) == 2
+      @test agregated[1][1] == date + Hour(2 * (10 - 1))
+      @test agregated[1][2] == Hour(6)
+      @test agregated[1][3] == 1
+      @test agregated[2][1] == date + Hour(2 * (10 - 1) + 6)
+      @test agregated[2][2] == Hour(6)
+      @test agregated[2][3] == 1
+    end
+  end
 end

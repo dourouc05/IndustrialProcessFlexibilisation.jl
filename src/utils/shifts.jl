@@ -11,21 +11,21 @@ function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts:
   # First extract long worked periods, not yet dealing with maximum shift duration. 
   shiftsOpenLong = Tuple{DateTime, Hour, Int}[]
 
-  start = timeBeginning(timing)
-  duration = 0
+  start = timeBeginning(timing) # Beginning of the current shift. 
+  duration = 1 # Number of "unit" shifts (from shiftsOpenRaw) within the current longer shift. 
 
   for i in 1:length(shiftsOpenRaw)
     if shiftsOpenRaw[i] && i > 1
       # This shift is worked: either a shift starts or continues. 
       if ! shiftsOpenRaw[i - 1] # Start. 
-        start = timeBeginning + (i - 1) * shiftDurationsStep(shifts)
+        start = timeBeginning(timing) + (i - 1) * shiftDurationsStep(shifts)
       else # Continuation. 
         duration += 1
       end
     elseif ! shiftsOpenRaw[i] && i > 1 && shiftsOpenRaw[i - 1]
       # This shift is not worked, but the previous was: this is the end of a shift. 
       push!(shiftsOpenLong, (start, duration * shiftDurationsStep(shifts), 1))
-      duration = 0
+      duration = 1
     end
   end
 
@@ -45,14 +45,15 @@ function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts:
       @variable(m, average >= 0)
       @variable(m, slackPlus[1:nShiftDurations(shifts)] >= 0)
       @variable(m, slackMinus[1:nShiftDurations(shifts)] >= 0)
-      @constraint(m, dot(n, shiftDurations(shifts)) == sol[2])
+      @constraint(m, dot(n, map(d -> d.value, shiftDurations(shifts))) == sol[2].value)
       @constraint(m, c[i=1:nShiftDurations(shifts)], n[i] * shiftDurations(shifts)[i].value + slackPlus[i] - slackMinus[i] == average)
-      @objective(m, Min, sum(slackPlus) + sum(slackMinus) + sum(n))
+      @objective(m, Min, sum(slackPlus) + sum(slackMinus) + 10 * sum(n))
       solve(m)
 
       start = sol[1]
-      for i in nShiftDurations(shifts)
-        for repetition in 1:getvalue(n[i])
+      ns = round.(Int, getvalue(n))
+      for i in 1:nShiftDurations(shifts)
+        for repetition in 1:ns[i]
           push!(shiftsOpen, (start, shiftDurations(shifts)[i], 1))
           start += shiftDurations(shifts)[i]
         end

@@ -1240,9 +1240,18 @@
     hro = HRCostObjective(hrp_test)
     o = ObjectiveCombination([eo, hro])
 
-    # The model should be built without error.
-    status, pm, m, shiftsOpen, productionRaw = productionModel(p, ob, t, s, o, solver=CbcSolver(logLevel=0))
-    @test(status)
+    # The model should be built and solved without error.
+    pr = productionModel(p, ob, t, s, o, solver=CbcSolver(logLevel=0))
+    @test pr.feasibility
+    @test sum(pr.shiftsOpenRaw) == 1
+    @test length(pr.shiftsOpen) == 1
+    @test pr.shiftsOpen[1][1] >= timeBeginning(t)
+    @test pr.shiftsOpen[1][1] <= timeEnding(t)
+    @test pr.shiftsOpen[1][2] == Hour(8)
+    @test pr.shiftsOpen[1][3] == 1
+    @test size(pr.productionPlanOutput, 1) == 840
+    @test size(pr.productionPlanOutput, 2) == 1
+    @test sum(pr.productionPlanOutput) == 360
   end
 
   @testset "Team model" begin

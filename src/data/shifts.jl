@@ -28,6 +28,11 @@ struct Shifts
       error("The maximum shift duration ($(durations.stop)) is not a multiple of the step ($(durations.step)).")
     end
 
+    # It is likely possible to get rid of the following constraint, but it helps a lot (production model and shift agregation). 
+    if durations.start != durations.step
+      error("For now, the minimum shift duration ($(durations.start)) must be equal to the step ($(durations.step)).")
+    end
+
     return new(beginning, durations)
   end
 end

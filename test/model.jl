@@ -1,64 +1,73 @@
 @testset "Optimisation models" begin
   @testset "Specific data structures" begin
     @testset "Timing" begin
-      date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
-      m = Model(solver=CbcSolver(logLevel=0))
-      hrm = TimingModel(m, t)
+      @testset "Basic case" begin
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+        m = Model(solver=CbcSolver(logLevel=0))
+        hrm = TimingModel(m, t, s)
 
-      @test(timing(hrm) == t)
-      @test(timeBeginning(hrm) == timeBeginning(t))
-      @test(timeHorizon(hrm) == timeHorizon(t))
-      @test(timeEnding(hrm) == timeEnding(t))
-      @test(timeStepDuration(hrm) == timeStepDuration(t))
-      @test(shiftBeginning(hrm) == shiftBeginning(t))
-      @test(shiftDuration(hrm) == shiftDuration(t))
+        @test(timing(hrm) == t)
+        @test(timeBeginning(hrm) == timeBeginning(t))
+        @test(timeHorizon(hrm) == timeHorizon(t))
+        @test(timeEnding(hrm) == timeEnding(t))
+        @test(timeStepDuration(hrm) == timeStepDuration(t))
+        @test(shiftBeginning(hrm) == shiftBeginning(s))
+        @test(shiftDuration(hrm) == shiftDuration(s))
+        @test(shiftDurations(hrm) == shiftDurations(s))
+        @test(shiftDurationsStart(hrm) == shiftDurationsStart(s))
+        @test(shiftDurationsStep(hrm) == shiftDurationsStep(s))
+        @test(shiftDurationsStop(hrm) == shiftDurationsStop(s))
 
-      @test(nTimeSteps(hrm) == 48)
-      @test(nTimeSteps(hrm, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
-      @test(nTimeSteps(hrm, Day(1)) == 24)
-      @test(nTimeStepsPerShift(hrm) == 8)
-      @test(nShifts(hrm) == 6)
+        @test(nTimeSteps(hrm) == 48)
+        @test(nTimeSteps(hrm, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
+        @test(nTimeSteps(hrm, Day(1)) == 24)
+        @test(nTimeStepsPerShift(hrm) == [8]) # Only one shift length available, hence a singleton (but not a scalar).
+        @test(nShifts(hrm) == 6)
 
-      @test_throws(ErrorException, dateToTimeStep(hrm, date - Hour(1)))
-      @test(dateToTimeStep(hrm, date) == 1)
-      @test(dateToTimeStep(hrm, date + Minute(15)) == 1)
-      @test(dateToTimeStep(hrm, date + Hour(1)) == 2)
-      @test(dateToTimeStep(hrm, date + Hour(8)) == 9) # One shift.
-      @test(dateToTimeStep(hrm, date + Hour(47)) == 48) # Optimisation horizon.
+        @test_throws(ErrorException, dateToTimeStep(hrm, date - Hour(1)))
+        @test(dateToTimeStep(hrm, date) == 1)
+        @test(dateToTimeStep(hrm, date + Minute(15)) == 1)
+        @test(dateToTimeStep(hrm, date + Hour(1)) == 2)
+        @test(dateToTimeStep(hrm, date + Hour(8)) == 9) # One shift.
+        @test(dateToTimeStep(hrm, date + Hour(47)) == 48) # Optimisation horizon.
 
-      @test_throws(ErrorException, dateToShift(hrm, date - Hour(1)))
-      @test(dateToShift(hrm, date) == 1)
-      @test(dateToShift(hrm, date + Hour(5)) == 1)
-      @test(dateToShift(hrm, date + Hour(7)) == 1)
-      @test(dateToShift(hrm, date + Hour(8)) == 2)
-      @test(dateToShift(hrm, date + Hour(12)) == 2)
+        @test_throws(ErrorException, dateToShift(hrm, date - Hour(1)))
+        @test(dateToShift(hrm, date) == 1)
+        @test(dateToShift(hrm, date + Hour(5)) == 1)
+        @test(dateToShift(hrm, date + Hour(7)) == 1)
+        @test(dateToShift(hrm, date + Hour(8)) == 2)
+        @test(dateToShift(hrm, date + Hour(12)) == 2)
 
-      # Optimisation variable accessors.
-      @test(shiftOpen(hrm, 1) == hrm.shiftOpen[1])
+        # Optimisation variable accessors.
+        @test(shiftOpen(hrm, 1) == hrm.shiftOpen[1])
 
-      @test(timeStepOpen(hrm, date) == shiftOpen(hrm, 1))
-      @test(timeStepOpen(hrm, date + Minute(15)) == shiftOpen(hrm, 1))
-      @test(timeStepOpen(hrm, date + Hour(15)) == shiftOpen(hrm, 2))
+        @test(timeStepOpen(hrm, date) == shiftOpen(hrm, 1))
+        @test(timeStepOpen(hrm, date + Minute(15)) == shiftOpen(hrm, 1))
+        @test(timeStepOpen(hrm, date + Hour(15)) == shiftOpen(hrm, 2))
+      end
 
-      # TODO: More involved tests: the beginning of the shifts is four hours before the optimisation.
-      date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
-      m = Model(solver=CbcSolver(logLevel=0))
-      hrm = TimingModel(m, t)
+      @testset "Beginning of the shifts is four hours before the optimisation" begin
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date - Hour(4), Hour(8))
+        m = Model(solver=CbcSolver(logLevel=0))
+        hrm = TimingModel(m, t, s)
 
-      @test_throws(ErrorException, dateToShift(hrm, date - Hour(4) - Hour(1)))
-      @test(dateToShift(hrm, date - Hour(4)) == 1)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(5)) == 1)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(7)) == 1)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(8)) == 2)
-      @test(dateToShift(hrm, date - Hour(4) + Hour(12)) == 2)
+        @test_throws(ErrorException, dateToShift(hrm, date - Hour(4) - Hour(1)))
+        @test(dateToShift(hrm, date - Hour(4)) == 1)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(5)) == 1)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(7)) == 1)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(8)) == 2)
+        @test(dateToShift(hrm, date - Hour(4) + Hour(12)) == 2)
+      end
     end
 
     @testset "Equipment" begin
       @testset "One product, one time step" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
         e = Equipment("EAF", :eaf)
         c = ConstantConsumption(2.0)
@@ -210,7 +219,7 @@
 
       @testset "Multiple products, one time step" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
         e = Equipment("EAF", :eaf)
         c = ConstantConsumption(2.0)
@@ -372,7 +381,7 @@
 
       @testset "One product, multiple time steps" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15))
 
         e = Equipment("EAF", :eaf) # One-hour duration
         c = ConstantConsumption(2.0)
@@ -531,7 +540,7 @@
 
       @testset "One product, multiple time steps" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(15))
 
         e = Equipment("EAF", :eaf) # One-hour duration
         c = ConstantConsumption(2.0)
@@ -703,7 +712,7 @@
     @testset "Consumption" begin
       @testset "No consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = NoConsumption()
@@ -719,7 +728,7 @@
 
       @testset "Constant consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = ConstantConsumption(2.0)
@@ -735,7 +744,7 @@
 
       @testset "Linear consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = LinearConsumption(2.0, 4.0)
@@ -751,7 +760,7 @@
 
       @testset "Quadratic consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = QuadraticConsumption(2.0, 4.0, 8.0)
@@ -767,7 +776,7 @@
 
       @testset "Piecewise linear consumption" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         e = Equipment("EAF", :eaf)
 
         c = PiecewiseLinearConsumption([1.0, 2.0], [4.0, 8.0])
@@ -784,7 +793,7 @@
 
     @testset "Order book" begin
       date = DateTime(2010, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
       e = Equipment("EAF", :eaf)
       c = ConstantConsumption(2.0)
@@ -883,10 +892,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         dobj = DummyProductionObjective()
         @test objectiveTimeStep(m, dobj, pm, date) == AffExpr()
@@ -905,10 +915,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         dobj = NoObjective()
         @test objectiveTimeStep(m, dobj, pm, date) == AffExpr()
@@ -927,10 +938,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         ep = [rand() for _ in eachTimeStep(t)]
         ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
@@ -955,10 +967,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
 
         ep = [rand() for _ in eachTimeStep(t)][4:end]
         ep_ts = TimeArray(collect(eachTimeStep(t))[4:end], ep)
@@ -974,10 +987,11 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
         hrm = timingModel(pm)
 
         f = (d::DateTime) -> Dates.hour(d)
@@ -993,7 +1007,7 @@
         @test_throws ErrorException objectiveShift(m, o, pm, date + Hour(1)) # Not the beginning of a shift.
       end
 
-      @testset "Objective combination" begin # TODO
+      @testset "Objective combination" begin
         e = Equipment("EAF", :eaf)
         p = Plant([e], Route[])
         c = ConstantConsumption(2.0)
@@ -1001,52 +1015,138 @@
 
         date = DateTime(2017, 01, 01, 08)
         ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         m = Model(solver=CbcSolver(logLevel=0))
-        pm = PlantModel(m, p, ob, t)
+        pm = PlantModel(m, p, ob, t, s)
+        hrm = timingModel(pm)
 
-        # dobj = DummyProductionObjective()
-        # @test objectiveTimeStep(m, dobj, pm, date) == 0.0
-        # @test objectiveTimeStep(m, dobj, pm, date + Hour(1)) == 0.0
-        # @test objectiveShift(m, dobj, pm, date) == 0.0
-        # @test objectiveShift(m, dobj, pm, date + Hour(8)) == 0.0
-        # @test objective(m, dobj, pm) == 0.0
-        # @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == 0.0
+        f = (d::DateTime) -> Dates.hour(d)
+        hro = HRCostObjective(f)
+
+        ep = [rand() for _ in eachTimeStep(t)]
+        ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
+        eo = EnergyObjective(ep_ts, t)
+
+        co = ObjectiveCombination([hro, eo], [.5, .75], symbols=[:hr, :en])
       end
     end
 
     @testset "Plant" begin
-      e1 = Equipment("EAF", :eaf)
-      e2 = Equipment("LF", :lf)
-      e3 = Equipment("CC", :cc)
-      le = [e1, e2, e3]
-      r1 = NormalRoute(e1, e2)
-      r2 = NormalRoute(e2, e3)
-      le = [e1, e2, e3]
-      lr = Route[r1, r2]
-      p = Plant(le, lr)
+      @testset "Base case" begin
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        e3 = Equipment("CC", :cc)
+        le = [e1, e2, e3]
+        r1 = NormalRoute(e1, e2)
+        r2 = NormalRoute(e2, e3)
+        le = [e1, e2, e3]
+        lr = Route[r1, r2]
+        p = Plant(le, lr)
 
-      c = ConstantConsumption(2.0)
-      e1 = Equipment("EAF", :eaf)
-      e2 = Equipment("LF", :lf)
-      e3 = Equipment("CC", :cc)
-      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
-      p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
-      ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
+        c = ConstantConsumption(2.0)
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        e3 = Equipment("CC", :cc)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+        p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+        ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 31) => (p2, 50.)))
 
-      date = DateTime(2017, 01, 01, 08)
-      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
-      m = Model(solver=CbcSolver(logLevel=0))
-      pm = PlantModel(m, p, ob, t)
+        m = Model(solver=CbcSolver(logLevel=0))
+        pm = PlantModel(m, p, ob, t, s)
 
-      # Basic accessors.
-      @test(timingModel(pm) == pm.hr)
-      @test(equipmentModels(pm) == pm.equipments)
-      @test(flowModels(pm) == pm.flows)
-      # @test(equipmentModel(pm, "EAF") == find()) TODO
-      # @test(flowModel(pm) == TODO
+        # Basic accessors.
+        @test plant(pm) == p
+        @test orderBook(pm) == ob
+        @test timing(pm) == t
+        @test shifts(pm) == s
+
+        @test timingModel(pm) == pm.hr
+        @test equipmentModels(pm) == pm.equipments
+        @test flowModels(pm) == pm.flows
+        @test orderBookModel(pm) == pm.ob
+        
+        @test nEquipments(pm) == 5 # 2 implicit, 3 normal
+
+        # Finding things. 
+        equips = collect(values(equipmentModels(pm)))
+        @test equipmentModel(pm, "EAF") == equips[find((e) -> name(e) == "EAF", equips)[1]]
+        @test equipmentModel(pm, "LF")  == equips[find((e) -> name(e) == "LF",  equips)[1]]
+        @test equipmentModel(pm, "CC")  == equips[find((e) -> name(e) == "CC",  equips)[1]]
+        @test_throws(ErrorException, equipmentModel(pm, "stuff"))
+
+        flows = collect(values(flowModels(pm)))
+        @test flowModel(pm, "EAF", "LF") == flows[find((f) -> name(origin(f)) == "EAF" && name(destination(f)) == "LF", flows)[1]]
+        @test flowModel(pm, "LF", "CC") == flows[find((f) -> name(origin(f)) == "LF" && name(destination(f)) == "CC", flows)[1]]
+        @test_throws(ErrorException, flowModel(pm, "EAF", "CC"))
+        @test_throws(ErrorException, flowModel(pm, "EAF", "stuff"))
+        @test flowModel(pm, ("EAF", "LF")) == flows[find((f) -> name(origin(f)) == "EAF" && name(destination(f)) == "LF", flows)[1]]
+        @test flowModel(pm, ("LF", "CC")) == flows[find((f) -> name(origin(f)) == "LF" && name(destination(f)) == "CC", flows)[1]]
+        @test_throws(ErrorException, flowModel(pm, ("EAF", "CC")))
+        @test_throws(ErrorException, flowModel(pm, ("EAF", "stuff")))
+
+        # Link to the methods of Timing. 
+        @test timeBeginning(pm) == timeBeginning(t)
+        @test timeHorizon(pm) == timeHorizon(t)
+        @test timeEnding(pm) == timeEnding(t)
+        @test timeStepDuration(pm) == timeStepDuration(t)
+
+        @test nTimeSteps(pm, Minute(15)) == nTimeSteps(t, Minute(15))
+        @test nTimeSteps(pm, Hour(1)) == nTimeSteps(t, Hour(1))
+        @test nTimeSteps(pm, Day(1)) == nTimeSteps(t, Day(1))
+        @test nTimeSteps(pm) == nTimeSteps(t)
+        @test_throws(ErrorException, dateToTimeStep(pm, date - Hour(1)))
+        @test dateToTimeStep(pm, date) == dateToTimeStep(t, date)
+        @test dateToTimeStep(pm, date + Hour(1)) == dateToTimeStep(t, date + Hour(1))
+
+        @test eachTimeStep(pm) == eachTimeStep(t)
+        @test eachTimeStep(pm, from=timeBeginning(t) + Day(3)) == eachTimeStep(t, from=timeBeginning(t) + Day(3))
+        @test eachTimeStep(pm, to=timeBeginning(t) + Day(3)) == eachTimeStep(t, to=timeBeginning(t) + Day(3))
+        @test eachTimeStep(pm, duration=Day(4)) == eachTimeStep(t, duration=Day(4))
+        @test_throws(ErrorException, eachTimeStep(pm, to=date, duration=date)) # Can't set both
+        @test_throws(ErrorException, eachTimeStep(pm, duration=date)) # Bad type for duration
+        @test_throws(ErrorException, eachTimeStep(pm, to=Hour(1))) # Bad type for to
+        @test_throws(ErrorException, eachTimeStep(pm, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+        @test_throws(ErrorException, eachTimeStep(pm, to=1)) # Invalid argument type.
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, to=date, duration=date)) # Can't set all parameters at once
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, duration=date)) # Bad type for duration
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, to=Hour(1))) # Bad type for to
+        @test_throws(ErrorException, eachTimeStep(pm, from=date, thiskeywordparameterdoesnotexist=Hour(1))) # Unknown keyword argument
+        @test_throws(TypeError, eachTimeStep(pm, from=1)) # Invalid argument type.
+
+        # Link to the methods of Shifts. 
+        @test shiftBeginning(pm) == shiftBeginning(s)
+        @test shiftDuration(pm) == shiftDuration(s)
+        @test shiftDurations(pm) == shiftDurations(s)
+        @test shiftDurationsStart(pm) == shiftDurationsStart(s)
+        @test shiftDurationsStep(pm) == shiftDurationsStep(s)
+        @test shiftDurationsStop(pm) == shiftDurationsStop(s)
+        @test minimumShiftDurations(pm) == minimumShiftDurations(s)
+        @test maximumShiftDurations(pm) == maximumShiftDurations(s)
+        @test nShiftDurations(pm) == nShiftDurations(s)
+
+        # Link to the methods of OrderBook.
+        @test orderBookDetails(pm) == orderBook(ob)
+        @test dates(pm) == dates(ob)
+        @test products(pm) == products(ob)
+        @test nProducts(pm) == nProducts(ob)
+        @test dueBy(pm, DateTime(2016)) == dueBy(ob, DateTime(2016))
+        @test dueBy(pm, DateTime(2017)) == dueBy(ob, DateTime(2017))
+        @test dueBy(pm, DateTime(2018)) == dueBy(ob, DateTime(2018))
+        @test dueBy(pm, DateTime(2016), cumulative=false) == dueBy(ob, DateTime(2016), cumulative=false)
+        @test dueBy(pm, DateTime(2017), cumulative=false) == dueBy(ob, DateTime(2017), cumulative=false)
+        @test dueBy(pm, DateTime(2018), cumulative=false) == dueBy(ob, DateTime(2018), cumulative=false)
+        @test productIds(pm) == productIds(ob)
+        @test productId(pm, p1) == productId(ob, p1)
+        @test productId(pm, p2) == productId(ob, p2)
+        @test productFromId(pm, 1) == productFromId(ob, 1)
+        @test productFromId(pm, 2) == productFromId(ob, 2)
+      end
     end
   end
 
@@ -1054,13 +1154,14 @@
     @testset "Timing" begin
       @testset "Shifts and optimisation starts simultaneously" begin
         date = DateTime(2017, 01, 01, 08)
-        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
 
         # Check the constraints behave as expected.
         # First shift 8:00-16:00: if the second time step is open, then the shift is open. (Actually, this constraint is
         # automatically rewritten as a shift opening.)
         m = Model(solver=CbcSolver(logLevel=0))
-        hrm = TimingModel(m, t)
+        hrm = TimingModel(m, t, s)
         postConstraints(m, hrm)
         @constraint(m, timeStepOpen(hrm, date + Hour(1)) == 1.)
         solve(m)
@@ -1068,7 +1169,7 @@
 
         # If the shift 16:00-0:00 is open, and if only one shift is allowed, then the maximum number of time steps is eight.
         m = Model(solver=CbcSolver(logLevel=0))
-        hrm = TimingModel(m, t)
+        hrm = TimingModel(m, t, s)
         postConstraints(m, hrm)
         @constraint(m, shiftOpen(hrm, 1) == 0.)
         @constraint(m, shiftOpen(hrm, 2) == 1.)
@@ -1082,11 +1183,12 @@
 
       @testset "Shifts begin before optimisation" begin
         date = DateTime(2017, 01, 01, 08)
-        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date - Hour(4), Hour(8))
 
         # If the first shift is open, can work at most four hours.
         m = Model(solver=CbcSolver(logLevel=0))
-        hrm = TimingModel(m, t)
+        hrm = TimingModel(m, t, s)
         postConstraints(m, hrm)
         @constraint(m, shiftOpen(hrm, 1) == 1.)
         for i in 2:nShifts(hrm)
@@ -1115,7 +1217,8 @@
     ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
 
     date = DateTime(2017, 01, 01, 08)
-    t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+    t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+    s = Shifts(t, date, Hour(8))
 
     epDates = collect(date:Hour(1):date + Week(5))
     ep = TimeArray(epDates, 50 + 10 * sin.(1:length(epDates)) + rand(length(epDates)))
@@ -1137,9 +1240,18 @@
     hro = HRCostObjective(hrp_test)
     o = ObjectiveCombination([eo, hro])
 
-    # The model should be built without error.
-    status, pm, m, shiftsOpen, productionRaw = productionModel(p, ob, t, o, solver=CbcSolver(logLevel=0))
-    @test(status)
+    # The model should be built and solved without error.
+    pr = productionModel(p, ob, t, s, o, solver=CbcSolver(logLevel=0))
+    @test pr.feasibility
+    @test sum(pr.shiftsOpenRaw) == 1
+    @test length(pr.shiftsOpen) == 1
+    @test pr.shiftsOpen[1][1] >= timeBeginning(t)
+    @test pr.shiftsOpen[1][1] <= timeEnding(t)
+    @test pr.shiftsOpen[1][2] == Hour(8)
+    @test pr.shiftsOpen[1][3] == 1
+    @test size(pr.productionPlanOutput, 1) == 840
+    @test size(pr.productionPlanOutput, 2) == 1
+    @test sum(pr.productionPlanOutput) == 360
   end
 
   @testset "Team model" begin

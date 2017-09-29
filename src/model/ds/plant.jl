@@ -2,6 +2,7 @@ struct PlantModel
   plant::Plant
   orderBook::OrderBook
   timing::Timing
+  shifts::Shifts
 
   hr::TimingModel
   equipments::Dict{AbstractString, AbstractEquipmentModel} # (name of equipment) -> equipment
@@ -10,9 +11,9 @@ struct PlantModel
   # and the outflow of finished products.
   ob::OrderBookModel
 
-  function PlantModel(m::Model, p::Plant, ob::OrderBook, timing::Timing)
+  function PlantModel(m::Model, p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts)
     # Create the variables for the HR part of the model.
-    hr = TimingModel(m, timing)
+    hr = TimingModel(m, timing, shifts)
 
     # Consistency check: the plant must have the required equipments for all the products in the order book.
     for pr in products(ob) # TODO: To check!
@@ -125,41 +126,56 @@ struct PlantModel
 
     orderBookModel = OrderBookModel(m, ob, timing)
 
-    return new(p, ob, timing, hr, eqs, flows, orderBookModel)
+    return new(p, ob, timing, shifts, hr, eqs, flows, orderBookModel)
   end
 end
 
 # Basic accessors for sub-objects.
-plant(pm::PlantModel) = pm.plant # TODO: To test!
-orderBook(pm::PlantModel) = pm.orderBook # TODO: To test!
-timing(pm::PlantModel) = pm.timing # TODO: To test!
+plant(pm::PlantModel) = pm.plant 
+orderBook(pm::PlantModel) = pm.orderBook 
+timing(pm::PlantModel) = pm.timing 
+shifts(pm::PlantModel) = pm.shifts 
 
 timingModel(pm::PlantModel) = pm.hr
 equipmentModels(pm::PlantModel) = pm.equipments
 flowModels(pm::PlantModel) = pm.flows
 orderBookModel(pm::PlantModel) = pm.ob
 
-equipmentModel(pm::PlantModel, e::AbstractString) = pm.equipments[e]
-flowModel(pm::PlantModel, f::Tuple{AbstractString, AbstractString}) = pm.flows[f]
-flowModel(pm::PlantModel, o::AbstractString, d::AbstractString) = pm.flows[(o, d)]
+equipmentModel(pm::PlantModel, e::AbstractString) = try pm.equipments[e]; catch; error("Equipment $(e) not found"); end
+flowModel(pm::PlantModel, f::Tuple{AbstractString, AbstractString}) = try pm.flows[f]; catch; error("Flow between $(f[1]) and $(f[2]) not found"); end
+flowModel(pm::PlantModel, o::AbstractString, d::AbstractString) = try pm.flows[(o, d)]; catch; error("Flow between $(o) and $(d) not found"); end
 
-nEquipments(pm::PlantModel) = length(equipments(pm))
+nEquipments(pm::PlantModel) = length(equipmentModels(pm))
 
 # Link to the methods of Timing.
 timeBeginning(pm::PlantModel) = timeBeginning(timing(pm))
 timeHorizon(pm::PlantModel) = timeHorizon(timing(pm))
 timeEnding(pm::PlantModel) = timeEnding(timing(pm)) # TODO: To test!
 timeStepDuration(pm::PlantModel) = timeStepDuration(timing(pm))
-shiftBeginning(pm::PlantModel) = shiftBeginning(timing(pm))
-shiftDuration(pm::PlantModel) = shiftDuration(timing(pm))
 
 nTimeSteps(pm::PlantModel, d::Period) = nTimeSteps(timing(pm), d) 
 nTimeSteps(pm::PlantModel) = nTimeSteps(timing(pm))
 dateToTimeStep(pm::PlantModel, d::DateTime) = dateToTimeStep(timing(pm), d)
 eachTimeStep(pm::PlantModel; kwargs...) = eachTimeStep(timing(pm); kwargs...)
 
+# Link to the methods of Shifts. 
+shiftBeginning(pm::PlantModel) = shiftBeginning(shifts(pm))
+shiftDuration(pm::PlantModel) = shiftDuration(shifts(pm))
+shiftDurations(pm::PlantModel) = shiftDurations(shifts(pm))
+shiftDurationsStart(pm::PlantModel) = shiftDurationsStart(shifts(pm)) 
+shiftDurationsStep(pm::PlantModel) = shiftDurationsStep(shifts(pm)) 
+shiftDurationsStop(pm::PlantModel) = shiftDurationsStop(shifts(pm)) 
+minimumShiftDurations(pm::PlantModel) = minimumShiftDurations(shifts(pm))
+maximumShiftDurations(pm::PlantModel) = maximumShiftDurations(shifts(pm))
+nShiftDurations(pm::PlantModel) = nShiftDurations(shifts(pm)) 
+
 # Link to the methods of OrderBook.
 orderBookDetails(pm::PlantModel) = orderBook(orderBook(pm))
 dates(pm::PlantModel) = dates(orderBook(pm))
 products(pm::PlantModel) = products(orderBook(pm))
 nProducts(pm::PlantModel) = nProducts(orderBook(pm))
+dueBy(pm::PlantModel, dt::DateTime; kwargs...) = dueBy(orderBook(pm), dt; kwargs...)
+fromto(pm::PlantModel, from::DateTime, to::DateTime) = fromto(orderBook(pm), from, to)
+productIds(pm::PlantModel) = productIds(orderBook(pm))
+productId(pm::PlantModel, p::Product) = productId(orderBook(pm), p)
+productFromId(pm::PlantModel, i::Int) = productFromId(orderBook(pm), i)

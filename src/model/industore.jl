@@ -274,11 +274,10 @@ function findCycles(solution::Array{Char, 2}) # TODO: To test!
   return cycles
 end
 
-function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionObjective,
-                       canWorkDays::BitArray{1}, canWorkNights::BitArray{1},
+function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts, obj::ProductionObjective,
                        priorNoticeDelay::Int, notificationFrequency::Int, completeHorizon::Int, optimisationHorizonForOrderBook::Int, optimisationHorizonForHR::Int, hoursPerShift::Int,
                        timeBetweenShifts::Int, consecutiveDaysOff::Tuple{Int, Int}, maxHoursPerWeek::Int, hoursContract::Tuple{Int, Int},
-                       coeffs::Tuple{Float64, Float64, Float64, Float64, Float64}, hrAlgo::Symbol,
+                       coeffs::Tuple{Float64, Float64, Float64, Float64, Float64, Float64}, hrAlgo::Symbol, nTeams::Int,
                        solver;
                        outFolder::AbstractString="./")
   # TODO: Find a better name for optimisationHorizonForHR (not really an optimisation horizon, as a larger horizon is computed, but only this part is communicated to the workers).
@@ -369,10 +368,6 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
     error("The solution must be computed at least as often (notificationFrequency = " * string(notificationFrequency) * ") as the notification are done (priorNoticeDelay = " * string(priorNoticeDelay) * "). ")
   end
 
-  if length(canWorkDays) != length(canWorkNights)
-    error("The arrays canWorkDays and canWorkNights do not have the same size (canWorkDays: " * string(length(canWorkDays)) * "; canWorkNights: " * string(length(canWorkNights)) * ").")
-  end
-
   if optimisationHorizonForOrderBook < optimisationHorizonForHR
     error("The optimisation horizon for the production part (optimisationHorizonForOrderBook = " * string(optimisationHorizonForOrderBook) * ") is smaller than that of HR (optimisationHorizonForHR = " * string(optimisationHorizonForHR) * ").")
   end
@@ -384,8 +379,7 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
   end
 
   ## Compute the basic global parameters.
-  nTeams = length(canWorkDays)
-  shiftsPerDay = round(Int, 24 / hoursPerShift)
+  shiftsPerDay = round(Int, 24 / hoursPerShift) # TODO: TO REMOVE! No more makes sense. 
 
   # The first iteration provides the solution for `priorNoticeDelay` days.
   # Each subsequent iteration provides the solution for `notificationFrequency` days.
@@ -393,8 +387,7 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
   #     completeHorizon = priorNoticeDelay + (I - 1) * notificationFrequency
   # The following formula is obtained by solving this equation for I.
   nIterations = ceil(Int, (completeHorizon - priorNoticeDelay) / notificationFrequency) + 1
-  wholeTiming = Timing(timeBeginning=timeBeginning(timing), timeHorizon=Day(completeHorizon), timeStepDuration=timeStepDuration(timing),
-                       shiftDuration=shiftDuration(timing), shiftBeginning=shiftBeginning(timing))
+  wholeTiming = Timing(timeBeginning=timeBeginning(timing), timeHorizon=Day(completeHorizon), timeStepDuration=timeStepDuration(timing))
 
   # Write it down.
   h5open(outFile, "w") do f
@@ -427,7 +420,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
   end
 
   ## Prepare to store the results of all iterations.
-  productionModels = Model[]
+  productionResults = ProductionModelResults[]
+  hrResults = HRModelResults[]
+
   solutions = BitArray{2}[]
   committedSolutions = BitArray{2}[]
   communicatedSolutions = BitArray{2}[]
@@ -460,23 +455,31 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
     end
 
     ## Optimisation: production.
+    # Set of shift indices that should carry over from previous iteration (if any). 
+    forcedShiftsIndices = (i == 1) ? Int[] : filter(1:length(productionResults[i - 1].shiftsOpen)) do s
+      # Take the shifts that have not yet been worked (notificationFrequency) but that were still decided by the previous iteration (priorNoticeDelay). 
+      d = productionResults[i - 1].shiftsOpen[s][1]
+      return d >= timeBeginning(nt) + Day(notificationFrequency) && d <= timeBeginning(nt) + Day(priorNoticeDelay)
+    end
+
     # Compute the HR requirements with a production model.
     println(" --------------- Production model ------------------------------------------------------------------------ ")
     if i == 1 # No initial solution to respect.
-      status, pm, mP, shifts, iterationQuantities = productionModel(p, ob, nt, nobj, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
+      pr = productionModel(p, ob, nt, shifts, nobj, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
     else # Has already something that is produced
-      status, pm, mP, shifts, iterationQuantities = productionModel(p, ob, nt, nobj, alreadyProduced=producedQuantities[i - 1], forcedShifts=vec(sum(solutions[i - 1][:, (1 + notificationFrequency * shiftsPerDay) : (priorNoticeDelay * shiftsPerDay)], 1)), outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
+      forcedShifts = vec(sum(solutions[i - 1][:, forcedShiftsIndices], 1))
+      pr = productionModel(p, ob, nt, shifts, nobj, alreadyProduced=producedQuantities[i - 1], forcedShifts=forcedShifts, outfile=outFolder * "m_prod_" * string(i) * ".lp", solver=solver)
     end
-    shifts = convert(Array{Int, 1}, shifts)
+    push!(productionResults, pr)
 
-    if ! status
+    if ! pr.feasibility
       println(" --------------- Production model infeasible! ---------------------------------------------------------- ")
-      return status, :Production
+      return false, :Production
     else
       println(" --------------- Production model objective: $(getobjectivevalue(mP)) -------------------------------------------------- ")
     end
 
-    iterationQuantities = vec(sum(iterationQuantities[1:nTimeSteps(timing, Day(priorNoticeDelay)), :], 1))
+    iterationQuantities = vec(sum(pr.productionPlanOutput[1:nTimeSteps(timing, Day(priorNoticeDelay)), :], 1))
 
     ## Optimisation: HR.
     # Now try to make the teams. Distinction based on the number of iterations performed: if this is the first
@@ -489,14 +492,14 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       # These bounds are used for all the teams.
 
       ## Perform team assignment.
-      status, mH, s, sl, sm, hrObj, hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair =
-        teamModel(shifts, hoursPerShift, timeBetweenShifts,
-                  consecutiveDaysOff, maxHoursPerWeek, boundsHours,
-                  canWorkDays, canWorkNights, coeffs,
-                  (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
-                  outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
+      hrr = teamModel(pr.shiftsOpen, timeBetweenShifts,
+                      consecutiveDaysOff, maxHoursPerWeek, boundsHours,
+                      nTeams, coeffs,
+                      (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
+                      outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
+      push!(hrResults, hrr)
 
-      if ! status
+      if ! hrr.feasibility
         println(" --------------- HR model infeasible! ---------------------------------------------------------------- ")
         return false, :HR
       else
@@ -504,10 +507,13 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       end
 
       ## Save some results from this iteration.
-      # priorNoticeDelay days worth of shifts, with shiftsPerDay shifts per day. Sum over the remaining shifts
-      # (i.e. second dimension).
-      workedHours[:, i] = hoursPerShift * sum(round.(Bool, round.(Int, s))[:, 1:priorNoticeDelay * shiftsPerDay], 2)
+      # Number of hours each time has worked during the shifts that are fixed in this iteration (i.e. priorNoticeDelay days).
+      # This variable is cumulative over the iterations.
+      for team in 1:nTeams
+        workedHours[team, i] = sum([productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[team, s] for s in 1:length(productionResults[i].shiftsOpen)])
+      end
 
+      # Quantity of each product made during this iteration.
       iterationQuantitiesDict = Dict{Product, Float64}(productFromId(ob, pid) => iterationQuantities[pid] for pid in 1:nProducts(ob))
       push!(producedQuantities, iterationQuantitiesDict)
     else # Use the previous iteration as an initial solution.
@@ -530,12 +536,7 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       end
 
       # No negative values are allowed.
-      if boundsH[1] <= 0.
-        boundsH[1] = 0.
-      end
-      if boundsH[2] <= 0.
-        boundsH[2] = 0.
-      end
+      boundsH[boundsH .<= 0] = 0.
 
       # The upper bound must be greater than or equal to the lower bound.
       if boundsH[2] <= boundsH[1]
@@ -546,14 +547,15 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       boundsHours = (boundsH[1], boundsH[2])
 
       ## Perform team assignment.
-      status, mH, s, sl, sm, hrObj, hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair =
-        teamModel(shifts, hoursPerShift, timeBetweenShifts,
-                  consecutiveDaysOff, maxHoursPerWeek, boundsHours,
-                  canWorkDays, canWorkNights, coeffs, (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
-                  solutions[i - 1][:, 1 + notificationFrequency * shiftsPerDay : end], :forceThenHint,
-                  outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)
+      hrr = teamModel(pr.shiftsOpen, timeBetweenShifts,
+                      consecutiveDaysOff, maxHoursPerWeek, boundsHours,
+                      nTeams, coeffs,
+                      (hrAlgo == :smart) ? falses(0, 0) : shiftFixedSchedule(shiftsFiveEight, (i - 1) * notificationFrequency),
+                      solutions[i - 1][:, forcedShiftsIndices], :forceThenHint, 
+                      outfile=outFolder * "m_hr_" * string(i) * ".lp", solver=solver)>
+      push!(hrResults, hrr)
 
-      if ! status
+      if ! hrr.feasibility
         println(" --------------- HR model infeasible! ---------------------------------------------------------------- ")
         return false, :HR
       else
@@ -561,24 +563,28 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       end
 
       ## Save some results from this iteration.
-      # priorNoticeDelay days worth of shifts, with shiftsPerDay shifts per day. Sum over the remaining shifts
-      # (i.e. second dimension). This variable is cumulative over the iterations.
-      workedHours[:, i] = workedHours[:, i - 1] + hoursPerShift * sum(round.(Bool, round.(Int, s))[:, 1:priorNoticeDelay * shiftsPerDay], 2)
+      # Number of worked hours (details in the comment for i == 1). 
+      for team in 1:nTeams
+        workedHours[team, i] = workedHours[team, i - 1] + sum([productionResults[i].shiftsOpen[s][2].value * hrr.teamAssignment[team, s] for s in 1:length(productionResults[i].shiftsOpen)])
+      end
 
+      # Quantity of each product made during this iteration.
       iterationQuantitiesDict = Dict{Product, Float64}(productFromId(ob, pid) => iterationQuantities[pid] + producedQuantities[i - 1][productFromId(ob, pid)] for pid in 1:nProducts(ob))
       push!(producedQuantities, iterationQuantitiesDict)
     end
 
     ## Fill internal data structures.
     # Raw solution in internal data structures.
-    push!(productionModels, mP)
-    push!(solutions, round.(Bool, round.(Int, s)))
-    push!(shiftsLess, round.(Bool, round.(Int, sl)))
-    push!(shiftsMore, round.(Bool, round.(Int, sm)))
+    push!(solutions, round.(Bool, round.(Int, hrResults[i].teamAssignment)))
+    push!(shiftsLess, round.(Bool, round.(Int, hrResults[i].objectiveDifferenceInitialSolutionLess)))
+    push!(shiftsMore, round.(Bool, round.(Int, hrResults[i].objectiveDifferenceInitialSolutionMore)))
 
     # Parts of the solution that make sense for the HR, internal data structures.
-    committedShifts = s[:, 1:priorNoticeDelay * shiftsPerDay]
-    communicatedEstimatedShifts = s[:, 1:optimisationHorizonForHR * shiftsPerDay]
+    committedIndices = filter((s) -> productionResults[i - 1].shiftsOpen[s][1] <= timeBeginning(nt) + Day(priorNoticeDelay), 1:length(productionResults[i].shiftsOpen)) # Take the shifts that have been decided by the current iteration (priorNoticeDelay). 
+    communicatedIndices = filter((s) -> productionResults[i - 1].shiftsOpen[s][1] <= timeBeginning(nt) + Day(optimisationHorizonForHR), 1:length(productionResults[i].shiftsOpen))
+
+    committedShifts = hrResults[i].teamAssignment[:, committedIndices]
+    communicatedEstimatedShifts = hrResults[i].teamAssignment[:, 1:communicatedIndices]
     push!(committedSolutions, round.(Bool, round.(Int, committedShifts)))
     push!(communicatedSolutions, round.(Bool, round.(Int, communicatedEstimatedShifts)))
 
@@ -618,10 +624,10 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       write(f, "it" * string(i) * "/hr/solutionTime", getsolvetime(mH))
 
       # Raw solution and differences with the previous iteration (if any).
-      write(f, "it" * string(i) * "/hr/global/shifts", round.(Int, s))
+      write(f, "it" * string(i) * "/hr/global/shifts", round.(Int, solutions[i]))
       if i > 1 # At the first iteration, there is no previous solution, so no difference to the previous solution.
-        write(f, "it" * string(i) * "/hr/global/shiftsMore", round.(Int, sm))
-        write(f, "it" * string(i) * "/hr/global/shiftsLess", round.(Int, sl))
+        write(f, "it" * string(i) * "/hr/global/shiftsMore", round.(Int, shiftsMore[i]))
+        write(f, "it" * string(i) * "/hr/global/shiftsLess", round.(Int, shiftsLess[i]))
       end
 
       # The bounds mechanism.
@@ -632,8 +638,8 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       write(f, "it" * string(i) * "/hr/communicated/committedShifts", committedShifts)
       write(f, "it" * string(i) * "/hr/communicated/estimatedShifts", communicatedEstimatedShifts)
       if i > 1 # At the first iteration, there is no previous solution, so no difference to the previous solution.
-        smi = round.(Int, sl[:, 1:optimisationHorizonForHR * shiftsPerDay])
-        sli = round.(Int, sm[:, 1:optimisationHorizonForHR * shiftsPerDay])
+        smi = round.(Int, shiftsMore[i][:, communicatedIndices])
+        sli = round.(Int, shiftsLess[i][:, communicatedIndices])
         write(f, "it" * string(i) * "/hr/communicated/shiftsMore", smi)
         write(f, "it" * string(i) * "/hr/communicated/shiftsLess", sli)
         write(f, "it" * string(i) * "/hr/communicated/numberShiftsMore", sum(smi, 2))
@@ -649,43 +655,47 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       write(f, "it" * string(i) * "/hr/objective/unfairness", hrUnfair)
 
       ## HR: perform a few analyses (just this iteration).
-      shiftsBool = round.(Bool, round.(Int, s))
-      letters = shiftsAsLetters(shiftsBool, firstDay=timeBeginning(nt))
-      lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
-      # cycles = findCycles(letters)
-      # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
+      # This only applies when shifts follow predictable patterns, i.e. not when they are being optimised! 
+      # Most analyses require three shifts a day, i.e. 8-hour shifts. 
+      if nShiftDurations(shifts) == 1 && shiftDuration(shift) == Hour(8)
+        shiftsBool = round.(Bool, round.(Int, solutions[i]))
+        letters = shiftsAsLetters(shiftsBool, firstDay=timeBeginning(nt))
+        lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
+        # cycles = findCycles(letters)
+        # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
 
-      write(f, "it" * string(i) * "/analysis/hr/shiftsAsLetters", lettersSerialisable)
-      # write(f, "it" * string(i) * "/analysis/hr/cycles", cycles) # Cycles are no more used.
+        write(f, "it" * string(i) * "/analysis/hr/shiftsAsLetters", lettersSerialisable)
+        # write(f, "it" * string(i) * "/analysis/hr/cycles", cycles) # Cycles are no more used.
 
-      write(f, "it" * string(i) * "/analysis/ucl/SYNT", lettersSerialisable)
+        write(f, "it" * string(i) * "/analysis/ucl/SYNT", lettersSerialisable)
 
-      write(f, "it" * string(i) * "/analysis/ucl/nShifts", countShifts(letters, 'w'))
-      write(f, "it" * string(i) * "/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
+        write(f, "it" * string(i) * "/analysis/ucl/nShifts", countShifts(letters, 'w'))
+        write(f, "it" * string(i) * "/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
 
-      for l1 in "MANR"
-        write(f, "it" * string(i) * "/analysis/ucl/n$(l1)", countShifts(letters, l1))
-        write(f, "it" * string(i) * "/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
-        for l2 in "MANR"
-          write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
-          for l3 in "MANR"
-            write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+        for l1 in "MANR"
+          write(f, "it" * string(i) * "/analysis/ucl/n$(l1)", countShifts(letters, l1))
+          write(f, "it" * string(i) * "/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
+          for l2 in "MANR"
+            write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
+            for l3 in "MANR"
+              write(f, "it" * string(i) * "/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+            end
           end
         end
-      end
 
-      write(f, "it" * string(i) * "/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
-      # write(f, "it" * string(i) * "/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
-      # write(f, "it" * string(i) * "/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
+        write(f, "it" * string(i) * "/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
+        # write(f, "it" * string(i) * "/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
+        # write(f, "it" * string(i) * "/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
 
-      if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
-        hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
-        write(f, "it" * string(i) * "/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt))
-        write(f, "it" * string(i) * "/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2))
+        if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
+          hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
+          write(f, "it" * string(i) * "/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt))
+          write(f, "it" * string(i) * "/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2))
 
-        PAYm = sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2) ./ (8 * countShifts(letters, 'w'))
-        PAYm[isnan.(PAYm)] = 0.
-        write(f, "it" * string(i) * "/analysis/ucl/PAYm", PAYm)
+          PAYm = sum(hrPrice(hrObj, timeBeginning(nt), shiftsBool, nt), 2) ./ (8 * countShifts(letters, 'w'))
+          PAYm[isnan.(PAYm)] = 0.
+          write(f, "it" * string(i) * "/analysis/ucl/PAYm", PAYm)
+        end
       end
     end
   end
@@ -725,14 +735,9 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       write(f, "results/analysis/ucl/PAYm", read(f, "it1/analysis/ucl/PAYm"))
     else
       nDaysBetweenIterations = priorNoticeDelay - notificationFrequency
-      nShiftsBetweenIterations = nDaysBetweenIterations * shiftsPerDay
 
       # Gather the complete solutions (HR and costs) from the results of each iteration.
-      solution = BitArray{2}(nTeams, completeHorizon * 3) # completeHorizon in days.
-      solution[:, 1 : size(committedSolutions[1], 2)] = committedSolutions[1]
-      for i in 2:nIterations
-        solution[:, size(committedSolutions[1], 2) + (i - 2) * notificationFrequency * shiftsPerDay + 1 : size(committedSolutions[1], 2) + (i - 1) * notificationFrequency * shiftsPerDay] = committedSolutions[i][:, (end - notificationFrequency * shiftsPerDay + 1) : end]
-      end
+      solution = hcat(committedSolutions...)
 
       if length(dailyObjectives) >= 1
         objectiveNames = Array{String}(nObjectives(obj))
@@ -755,44 +760,48 @@ function modelMultiple(p::Plant, ob::OrderBook, timing::Timing, obj::ProductionO
       end
 
       # Perform a few analyses and write the results down.
-      letters = shiftsAsLetters(solution, firstDay=timeBeginning(timing))
-      lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
-      # cycles = findCycles(letters)
-      # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
+      # This only applies when shifts follow predictable patterns, i.e. not when they are being optimised! 
+      # Most analyses require three shifts a day, i.e. 8-hour shifts. 
+      if nShiftDurations(shifts) == 1 && shiftDuration(shift) == Hour(8)
+        letters = shiftsAsLetters(solution, firstDay=timeBeginning(timing))
+        lettersSerialisable = String[join(map(string, letters[i, :]), ",") for i in 1:size(letters, 1)]
+        # cycles = findCycles(letters)
+        # cycleLengths = [[cycle[2] - cycle[1] + 1 for cycle in cycles[team]] for team in 1:nTeams]
 
-      write(f, "results/hr/shifts", round.(Int, solution))
+        write(f, "results/hr/shifts", round.(Int, solution))
 
-      write(f, "results/analysis/hr/shiftsAsLetters", lettersSerialisable)
-      # write(f, "results/analysis/hr/cycles", cycles) # Cycles are no more used.
+        write(f, "results/analysis/hr/shiftsAsLetters", lettersSerialisable)
+        # write(f, "results/analysis/hr/cycles", cycles) # Cycles are no more used.
 
-      write(f, "results/analysis/ucl/SYNT", lettersSerialisable)
+        write(f, "results/analysis/ucl/SYNT", lettersSerialisable)
 
-      write(f, "results/analysis/ucl/nShifts", countShifts(letters, 'w'))
-      write(f, "results/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
+        write(f, "results/analysis/ucl/nShifts", countShifts(letters, 'w'))
+        write(f, "results/analysis/ucl/nWE", countShifts(letters, 'w', weekend=true))
 
-      for l1 in "MANR"
-        write(f, "results/analysis/ucl/n$(l1)", countShifts(letters, l1))
-        write(f, "results/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
-        for l2 in "MANR"
-          write(f, "results/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
-          for l3 in "MANR"
-            write(f, "results/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+        for l1 in "MANR"
+          write(f, "results/analysis/ucl/n$(l1)", countShifts(letters, l1))
+          write(f, "results/analysis/ucl/nWE$(l1)", countShifts(letters, l1, weekend=true))
+          for l2 in "MANR"
+            write(f, "results/analysis/ucl/n$(l1)$(l2)", countShiftSequences(letters, [l1, l2]))
+            for l3 in "MANR"
+              write(f, "results/analysis/ucl/n$(l1)$(l2)$(l3)", countShiftSequences(letters, [l1, l2, l3]))
+            end
           end
         end
-      end
 
-      write(f, "results/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
-      # write(f, "results/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
-      # write(f, "results/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
+        write(f, "results/analysis/ucl/LS", 8 * countShifts(letters, 'w'))
+        # write(f, "results/analysis/ucl/CYCL", [mean(cycleLengths[team]) for team in 1:nTeams])
+        # write(f, "results/analysis/ucl/LW", [mean([sum([if letters[1 + team, d] == 'R'; 8; else; 0; end for d in cycle[1]:cycle[2]]) for cycle in cycles[team]]) for team in 1:nTeams])
 
-      if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
-        hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
-        write(f, "results/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(timing), solution, timing))
-        write(f, "results/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2))
+        if isa(obj, ObjectiveCombination) || isa(obj, HRCostObjective)
+          hrObj = (isa(obj, ObjectiveCombination)) ? find(HRCostObjective, obj) : obj
+          write(f, "results/analysis/ucl/PAY", hrPrice(hrObj, timeBeginning(timing), solution, timing))
+          write(f, "results/analysis/ucl/PAYt", sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2))
 
-        PAYm = sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2) ./ (8 * countShifts(letters, 'w'))
-        PAYm[isnan.(PAYm)] = 0.
-        write(f, "results/analysis/ucl/PAYm", PAYm)
+          PAYm = sum(hrPrice(hrObj, timeBeginning(timing), solution, timing), 2) ./ (8 * countShifts(letters, 'w'))
+          PAYm[isnan.(PAYm)] = 0.
+          write(f, "results/analysis/ucl/PAYm", PAYm)
+        end
       end
     end
   end

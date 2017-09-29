@@ -1,4 +1,4 @@
-function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=true, restrictToTiming::Bool=true)
+function convert(::Type{Array}, ob::OrderBook, timing::Timing, shifts::Shifts; shiftly::Bool=true, restrictToTiming::Bool=true)
   if ! shiftly # TODO: Implement.
     error("Not yet implemented: can only export the orders per shift for now.")
   end
@@ -12,7 +12,7 @@ function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=tru
   end
 
   # Main loop over each product.
-  obMatrix = zeros(nShifts(timing), nProducts(nob))
+  obMatrix = zeros(nShifts(timing, shifts), nProducts(nob))
   for pid in 1:nProducts(nob)
     prod = productFromId(nob, pid)
     db = dueBy(nob, timeBeginning(timing), cumulative=true)
@@ -24,16 +24,16 @@ function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=tru
     # Loop over all time indices, starting at the second. Pay attention to the way time is handled: the orders do not
     # necessarily have the same frequency as the output of this function. Hence integrate between two output time
     # indices. dueBy allows integrating from the beginning of times.
-    d = timeBeginning(timing) + shiftDuration(timing)
+    d = timeBeginning(timing) + shiftDurationsStep(shifts)
     while d < timeEnding(timing)
       # Go to the next output time index.
       t += 1
-      d += shiftDuration(timing)
+      d += shiftDurationsStep(shifts)
 
       # Integrate the new orders between the last output time index and this one.
       db = dueBy(nob, d, cumulative=true)
       if haskey(db, prod)
-        dbOld = dueBy(nob, d - shiftDuration(timing), cumulative=true)
+        dbOld = dueBy(nob, d - shiftDurationsStep(shifts), cumulative=true)
         if haskey(dbOld, prod)
           obMatrix[t, pid] = db[prod] - dbOld[prod]
         else
@@ -47,6 +47,6 @@ function convert(::Type{Array}, ob::OrderBook, timing::Timing; shiftly::Bool=tru
   return obMatrix
 end
 
-writecsv(io, ob::OrderBook, timing::Timing; shiftly::Bool=true, restrictToTiming::Bool=true) =
-  writecsv(io, convert(Array, ob, timing, shiftly=shiftly, restrictToTiming=restrictToTiming))
+writecsv(io, ob::OrderBook, timing::Timing, shifts::Shifts; shiftly::Bool=true, restrictToTiming::Bool=true) =
+  writecsv(io, convert(Array, ob, timing, shifts, shiftly=shiftly, restrictToTiming=restrictToTiming))
   # TODO: Add the dates in the output?

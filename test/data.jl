@@ -567,18 +567,15 @@
 
     @testset "Constructor and getters" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
       @test(timeBeginning(t) == date)
       @test(timeHorizon(t) == Week(1))
       @test(timeEnding(t) == date + Week(1) - Hour(1))
       @test(timeStepDuration(t) == Hour(1))
-      @test(shiftBeginning(t) == date - Hour(4))
-      @test(shiftDuration(t) == Hour(8))
 
       @test(nTimeSteps(t) == 168)
       @test(nTimeSteps(t, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
       @test(nTimeSteps(t, Day(1)) == 24)
-      @test(nTimeStepsPerShift(t) == nTimeSteps(t, shiftDuration(t)))
       @test(nDays(t) == 7)
 
       @test(daysOfWeekUntil(t, DateTime(2016, 12, 31)) == [])
@@ -592,82 +589,46 @@
     @testset "Constructor error handling" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
 
-      # Throw an error when the shift duration is not a number of hours.
-      @test_throws(ErrorException, Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Second(744)))
-
       # Throw an error when a noninteger number of time steps are required for one hour.
-      @test_throws(ErrorException, Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(25), shiftBeginning=date - Hour(4), shiftDuration=Hour(8)))
-
-      # Throw an error when the shifts start later than the optimisation.
-      @test_throws(ErrorException, Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date + Hour(4), shiftDuration=Hour(8)))
+      @test_throws(ErrorException, Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Minute(25)))
     end
 
     @testset "Converting dates to time steps and shifts" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
       @test_throws(ErrorException, dateToTimeStep(t, date - Hour(1)))
       @test(dateToTimeStep(t, date) == 1)
       @test(dateToTimeStep(t, date + Hour(1)) == 2)
-
-      @test_throws(ErrorException, dateToShift(t, date - Hour(4) - Hour(1)))
-      @test(dateToShift(t, date - Hour(4)) == 1)
-      @test(dateToShift(t, date - Hour(4) + Hour(5)) == 1)
-      @test(dateToShift(t, date - Hour(4) + Hour(7)) == 1)
-      @test(dateToShift(t, date - Hour(4) + Hour(8)) == 2)
-      @test(dateToShift(t, date - Hour(4) + Hour(12)) == 2)
     end
 
     @testset "Shifting in time" begin
       # Shifting objects: first by 0 days (i.e. do nothing), then by one day, and finally also tweak the horizon.
       date = DateTime(2017, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
       @test(timeBeginning(shift(t, Day(0))) == date)
-      @test(shiftBeginning(shift(t, Day(0))) == date - Hour(4))
       @test(timeHorizon(shift(t, Day(0))) == timeHorizon(t))
       @test(timeEnding(shift(t, Day(0))) == date + Week(1) - Hour(1))
       @test(timeStepDuration(shift(t, Day(0))) == Hour(1))
-      @test(shiftDuration(shift(t, Day(0))) == Hour(8))
 
       @test(timeBeginning(shift(t, Day(1))) == date + Day(1))
-      @test(shiftBeginning(shift(t, Day(1))) == date + Day(1) - Hour(4))
       @test(timeHorizon(shift(t, Day(1))) == timeHorizon(t))
       @test(timeEnding(shift(t, Day(1))) == date + Day(1) + Week(1) - Hour(1))
       @test(timeStepDuration(shift(t, Day(1))) == Hour(1))
-      @test(shiftDuration(shift(t, Day(1))) == Hour(8))
 
       @test(timeBeginning(shift(t, Day(1), horizon=Week(1))) == date + Day(1))
-      @test(shiftBeginning(shift(t, Day(1), horizon=Week(1))) == date + Day(1) - Hour(4))
       @test(timeHorizon(shift(t, Day(1), horizon=Week(1))) == Week(1))
       @test(timeEnding(shift(t, Day(1), horizon=Week(1))) == date + Day(1) + Week(1) - Hour(1))
       @test(timeStepDuration(shift(t, Day(1), horizon=Week(1))) == Hour(1))
-      @test(shiftDuration(shift(t, Day(1), horizon=Week(1))) == Hour(8))
 
       @test(timeBeginning(shift(t, Day(1), horizon=Week(2))) == date + Day(1))
-      @test(shiftBeginning(shift(t, Day(1), horizon=Week(2))) == date + Day(1) - Hour(4))
       @test(timeHorizon(shift(t, Day(1), horizon=Week(2))) == Week(2))
       @test(timeEnding(shift(t, Day(1), horizon=Week(2))) == date + Day(1) + Week(2) - Hour(1))
       @test(timeStepDuration(shift(t, Day(1), horizon=Week(2))) == Hour(1))
-      @test(shiftDuration(shift(t, Day(1), horizon=Week(2))) == Hour(8))
-    end
-
-    @testset "Number of shifts" begin
-      date = DateTime(2017, 01, 01, 12, 32, 42)
-
-      # Focus on number of shifts: when optimisation and shifts start simultaneously, the computation is easy; if shifts start
-      # before, there must be one more shift at most.
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
-      @test(nShifts(t) == 3 * 7)
-
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
-      @test(nShifts(t) == 3 * 7 + 1)
-
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(12), shiftDuration=Hour(8))
-      @test(nShifts(t) == 3 * 7 + 1)
     end
 
     @testset "Iterators" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
-      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
       # eachTimeStep, base call
       d = timeBeginning(t)
@@ -737,4 +698,85 @@
       @test(done(it, state))
     end
   end
+  
+  # @testset "Shifts" begin
+  #   @testset "Constructor and getters" begin
+  #     date = DateTime(2017, 01, 01, 12, 32, 42)
+  #     t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+  #     @test(shiftBeginning(t) == date - Hour(4))
+  #     @test(shiftDuration(t) == Hour(8))
+
+  # # TODO: WTF? 
+      # # @test(nTimeStepsPerShift(t) == nTimeSteps(t, shiftDuration(t)))
+  #   end
+
+  #   @testset "Constructor error handling" begin
+  #     date = DateTime(2017, 01, 01, 12, 32, 42)
+
+  #     # Throw an error when the shift duration is not a number of hours.
+  #     @test_throws(ErrorException, Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Second(744)))
+
+  #     # Throw an error when the shifts start later than the optimisation.
+  #     @test_throws(ErrorException, Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date + Hour(4), shiftDuration=Hour(8)))
+  #   end
+
+  #   @testset "Converting dates to time steps and shifts" begin
+  #     date = DateTime(2017, 01, 01, 12, 32, 42)
+  #     t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+  #     @test_throws(ErrorException, dateToShift(t, date - Hour(4) - Hour(1)))
+  #     @test(dateToShift(t, date - Hour(4)) == 1)
+  #     @test(dateToShift(t, date - Hour(4) + Hour(5)) == 1)
+  #     @test(dateToShift(t, date - Hour(4) + Hour(7)) == 1)
+  #     @test(dateToShift(t, date - Hour(4) + Hour(8)) == 2)
+  #     @test(dateToShift(t, date - Hour(4) + Hour(12)) == 2)
+  #   end
+
+  #   @testset "Shifting in time" begin
+  #     # Shifting objects: first by 0 days (i.e. do nothing), then by one day, and finally also tweak the horizon.
+  #     date = DateTime(2017, 01, 01, 12, 32, 42)
+  #     t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+  #     @test(timeBeginning(shift(t, Day(0))) == date)
+  #     @test(shiftBeginning(shift(t, Day(0))) == date - Hour(4))
+  #     @test(timeHorizon(shift(t, Day(0))) == timeHorizon(t))
+  #     @test(timeEnding(shift(t, Day(0))) == date + Week(1) - Hour(1))
+  #     @test(timeStepDuration(shift(t, Day(0))) == Hour(1))
+  #     @test(shiftDuration(shift(t, Day(0))) == Hour(8))
+
+  #     @test(timeBeginning(shift(t, Day(1))) == date + Day(1))
+  #     @test(shiftBeginning(shift(t, Day(1))) == date + Day(1) - Hour(4))
+  #     @test(timeHorizon(shift(t, Day(1))) == timeHorizon(t))
+  #     @test(timeEnding(shift(t, Day(1))) == date + Day(1) + Week(1) - Hour(1))
+  #     @test(timeStepDuration(shift(t, Day(1))) == Hour(1))
+  #     @test(shiftDuration(shift(t, Day(1))) == Hour(8))
+
+  #     @test(timeBeginning(shift(t, Day(1), horizon=Week(1))) == date + Day(1))
+  #     @test(shiftBeginning(shift(t, Day(1), horizon=Week(1))) == date + Day(1) - Hour(4))
+  #     @test(timeHorizon(shift(t, Day(1), horizon=Week(1))) == Week(1))
+  #     @test(timeEnding(shift(t, Day(1), horizon=Week(1))) == date + Day(1) + Week(1) - Hour(1))
+  #     @test(timeStepDuration(shift(t, Day(1), horizon=Week(1))) == Hour(1))
+  #     @test(shiftDuration(shift(t, Day(1), horizon=Week(1))) == Hour(8))
+
+  #     @test(timeBeginning(shift(t, Day(1), horizon=Week(2))) == date + Day(1))
+  #     @test(shiftBeginning(shift(t, Day(1), horizon=Week(2))) == date + Day(1) - Hour(4))
+  #     @test(timeHorizon(shift(t, Day(1), horizon=Week(2))) == Week(2))
+  #     @test(timeEnding(shift(t, Day(1), horizon=Week(2))) == date + Day(1) + Week(2) - Hour(1))
+  #     @test(timeStepDuration(shift(t, Day(1), horizon=Week(2))) == Hour(1))
+  #     @test(shiftDuration(shift(t, Day(1), horizon=Week(2))) == Hour(8))
+  #   end
+
+  #   @testset "Number of shifts" begin
+  #     date = DateTime(2017, 01, 01, 12, 32, 42)
+
+  #     # Focus on number of shifts: when optimisation and shifts start simultaneously, the computation is easy; if shifts start
+  #     # before, there must be one more shift at most.
+  #     t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date, shiftDuration=Hour(8))
+  #     @test(nShifts(t) == 3 * 7)
+
+  #     t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(4), shiftDuration=Hour(8))
+  #     @test(nShifts(t) == 3 * 7 + 1)
+
+  #     t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1), shiftBeginning=date - Hour(12), shiftDuration=Hour(8))
+  #     @test(nShifts(t) == 3 * 7 + 1)
+  #   end
+  # end
 end

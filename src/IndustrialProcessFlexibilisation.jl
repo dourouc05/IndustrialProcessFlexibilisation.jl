@@ -2,7 +2,9 @@ module IndustrialProcessFlexibilisation
   ## Exports for data structures (data/).
   # Genera data structures (data/)
   export Timing
-  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, shiftBeginning, shiftDuration, nOccurrencesPerPeriod, nTimeSteps, nTimeStepsPerShift, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep, dateToShift, shift
+  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, nOccurrencesPerPeriod, nTimeSteps, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep
+  export Shifts
+  export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, shiftDurationsStart, shiftDurationsStep, shiftDurationsStop, minimumShiftDurations, maximumShiftDurations, nTimeStepsPerShift, dateToShift, shift
   # Plant data structures (data/plant/)
   export ConsumptionModel, NoConsumption, ConstantConsumption, LinearConsumption, QuadraticConsumption, PiecewiseLinearConsumption,
          AbstractEquipment, Equipment, ImplicitEquipment, InImplicitEquipment, OutImplicitEquipment, inEquipment, outEquipment,
@@ -33,16 +35,17 @@ module IndustrialProcessFlexibilisation
   export equipment, quantity, flowIn, flowOut, on, off, start, stop, currentProduct, checkDate, productId,
          origin, destination, timing, orderBook, minimumValue, maximumValue, orderBookDetails,
          objectiveTimeStep, objectiveShift, objective, objectives, symbols, weights, weight, nObjectives, objectiveObject, objective, symbol, weight, nonzeroObjectives, hasObjective, electricityPrice, hrPrice,
-         timing, shiftOpen, shiftOpen, timeStepOpen,
+         timing, shifts, shiftOpen, shiftOpen, timeStepOpen,
          plant, timingModel, equipmentModels, flowModels, orderBookModel, equipmentModel, flowModel, nEquipments
 
 
 
   ## Exports for IO (io/).
-  # Only adding methods to Base functions.
+  # Only adding methods to Base functions, explicitly imported below.
 
   ## Exports for utilities (utils/).
   export smooth, changeVolatility
+  export shiftsAgregation
 
   using Base.Iterators
   using Base.Dates
@@ -51,17 +54,19 @@ module IndustrialProcessFlexibilisation
 
   using MathProgBase
   using JuMP
-  using Nemo
 
   using HDF5
 
-  solve = JuMP.solve # Resolve conflict between Nemo and JuMP
+  # Nemo disabled for now (could be used for a reformulation of the HR problem, but not working right now). 
+  # using Nemo
+  # solve = JuMP.solve # Resolve conflict between Nemo and JuMP
 
   import Base: start, next, done, eltype, length, copy, find, ==, hash, writecsv, replace, convert
   import Base.Random: rand
   import TimeSeries: from, to
 
   include("data/data.jl")
+  include("utils/shifts.jl")
   include("model/model.jl")
   include("io/datastructures_io.jl")
   include("io/results_io.jl")

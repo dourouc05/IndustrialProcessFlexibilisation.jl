@@ -6,6 +6,8 @@ include("ds/consumption.jl")
 include("ds/plant.jl")
 include("ds/objective.jl")
 
+include("results/production.jl")
+
 include("production.jl")
 include("hr.jl")
 include("industore.jl")

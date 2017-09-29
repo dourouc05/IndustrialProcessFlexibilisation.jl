@@ -1,3 +1,5 @@
+# TODO: How does a predefined schedule work with fully flexible schedules? 
+
 shiftsFiveEight = Array(falses(5, 30)) # [team, shift]
 # Copied from https://fr.wikipedia.org/wiki/5_%C3%97_8
 shiftsFiveEight[1, [1,  4,  8,  11, 15, 18]] = 1 # MMAANNRRRR
@@ -22,97 +24,130 @@ function shiftFixedSchedule(fixedSchedule::Array{Bool,2}, nDays::Int)
   return newSchedule
 end
 
-function teamModel(neededTeamsForShifts::Array{Int, 1}, hoursPerShift::Int, timeBetweenShifts::Int,
+function teamModel(neededTeamsForShifts::Array{Tuple{DateTime, Hour, Int}, 1}, timeBetweenShifts::Int,
                    consecutiveDaysOff::Tuple{Int, Int}, maxHoursPerWeek::Int, boundsHours::Tuple{Float64, Float64},
-                   canWorkDays::BitArray{1}, canWorkNights::BitArray{1},
-                   coeffs::NTuple{5, Float64}=(1., 1., 500., 1000., 0.),
+                   nTeams::Int, # TODO: NEW! Second parameter deleted. 
+                   coeffs::NTuple{6, Float64}=(1., 1., 500., 1000., 0., 0.),
                    fixedSchedule::BitArray{2}=falses(0, 0),
                    initialSolution::BitArray{2}=falses(0, 0), initialSolutionMode::Symbol=:none;
                    solver::MathProgBase.AbstractMathProgSolver=JuMP.UnsetSolver(), outfile="")
+  ## Check hypotheses. 
+  # At least one shift required. 
+  if length(neededTeamsForShifts) < 1
+    error("No shifts are required. ")
+  end
+
+  # Shifts follow each other (sorted along time). 
+  for i in 1:length(neededTeamsForShifts)
+    currentTime = neededTeamsForShifts[i][1]
+    for j in (i + 1):length(neededTeamsForShifts)
+      if neededTeamsForShifts[j][1] <= currentTime
+        error("Shift number $(j) starts before shift $(i) while it is after in the given list ($(i): $(currentTime); $(j): $(neededTeamsForShifts[j][1])). ")
+      end
+    end
+  end
+  
+  # Days off require some horizon. 
+  if nDays <= consecutiveDaysOff[2]
+    warn("Optimisation horizon not long enough to implement a days-off constraint: only " * string(nDays) * " days, while the constraint works with horizons of " * string(consecutiveDaysOff[2]) * " days.")
+  end
+
+  # If fixed schedule, then all shifts have a given length. 
+  # TODO: get a PlantModel or something here to check this hypothesis! 
+
   ## Derived data from inputs.
+  # Tables of correspondance between shifts and some periods of time.
+  encodeDay(dt::DateTime) = 10_000 * year(dt) + 100 * month(dt) + day(dt)
+  encodeWeek(dt::DateTime) = 100 * year(dt) + week(dt)
+
+  days = sort(unique([encodeDay(tuple[1]) for tuple in neededTeamsForShifts]))
+  weeks = sort(unique([encodeWeek(tuple[1]) for tuple in neededTeamsForShifts]))
+
+  dayToShifts  = Dict(day -> [s for s in 1:nShifts if encodeDay(neededTeamsForShifts[s][1]) == day] for day in days) # Day index -> list of shift indices for that day
+  weekToShifts = Dict(week -> [s for s in 1:nShifts if encodeWeek(neededTeamsForShifts[s][1]) == week] for week in weeks) # Week index -> list of shift indices for that week
+  
+  # Prepare the sets for implement the days off constraint. 
+  #   - tupleDays: tuples of consecutiveDaysOff[1] consecutive days. These are potential "week ends". 
+  #   - offTupleDays: sets of tuples where the constraint is written. For each of them, at least one tuple must be active. 
+  tupleDays = [[days[i - j] for j in 0:-1:consecutiveDaysOff[1]] for i in consecutiveDaysOff[1]:length(days)]
+  offTupleDays = Array{Int, 1}[]
+  firstDay = minimum(tuple[1] for tuple in neededTeamsForShifts)
+  lastDay = maximum(tuple[1] for tuple in neededTeamsForShifts)
+  for startDayOff in 1:(nDays - consecutiveDaysOff[2])
+    # Consider every tuple completely between startDayOff and startDayOff + consecutiveDaysOff[2]
+    push!(offTupleDays, 
+      filter(
+        (tuple) -> tuple[1] >= encodeDay(firstDay + Day(startDayOff - 1)) && tuple[end] <= encodeDay(firstDay + Day(startDayOff + consecutiveDaysOff[2] - 1)), 
+        tupleDays
+      )
+    )
+  end
+
+  tupleDayToShifts = Dict(tupleDay -> [s for s in 1:nShifts if encodeDay(neededTeamsForShifts[s][1]) in tupleDay] for tupleDay in tupleDays) # Day tuple as index -> list of shift indices for that tuple (for any number of days within that tuple)
+  # consecutiveDaysOffPeriods = [hcat([]...) for i in 1:(nDays - consecutiveDaysOff[2])] # Write the constraint as a rolling horizon.
+
   # Basic counting and dividing.
-  nTeams = length(canWorkDays)
+  dates = [pair[1] for pair in neededTeamsForShifts]
+
   nShifts = length(neededTeamsForShifts)
-  nDays = floor(Int, nShifts / 3)
-  nWeeks = ceil(Int, nDays / 7)
-  nCompleteWeeks = floor(Int, nDays / 7)
+  nWorkedHours = sum(tuple[2] for tuple in neededTeamsForShifts).value
 
-  shiftsPerDay = round(Int, 24 / hoursPerShift) # This value should be exact. TODO: Get rid of this; only useful for the `days` and `tupleDays` dictionnaries, it should be built on more robust things (what if shift lengths vary?).
-  shiftsPerWeek = 7 * shiftsPerDay # TODO: Get rid of this; only useful for the `weeks` dictionnary.
-
-  # Tables of correspondance between hours, shifts, and some periods.
-  weeks = Dict(week => collect((week - 1) * shiftsPerWeek + 1 : shiftsPerWeek * week) for week in 1:nWeeks) # week number (even incomplete) -> shifts in that week
-  tupleDays = Dict(day => collect((day - 1) * shiftsPerDay + 1 : min((day - 1) * shiftsPerDay + shiftsPerDay * consecutiveDaysOff[1], nShifts)) for day in 1:(nDays - 1)) # day number -> shifts in that day and consecutiveDaysOff[1] - 1 next ones (i.e. a period of consecutiveDaysOff[1] days)
-  partialShiftsPerPeriod = shiftsPerDay * consecutiveDaysOff[1] # Even if a shift only has 2 hours in a day, it is counted in this value.
+  nWorkedDays = length(nDays) # Only days when workers are required: not necessarily nWeeks / 7! 
+  nDays = days(max(dates) - min(dates)) # All days in the horizon. 
+  nWeeks = length(weeks) # Only weeks when workers are required: not necessarily nCompleteWeeks \pm 1! 
+  nCompleteWeeks = floor(Int, nDays / 7) # All complete weeks in the horizon. 
 
   # Incompatibility "graph" between worked shifts: if one shift is worked, then the others cannot be.
+  # Used to implement the fact that a given amount of rest must be respected between shifts (timeBetweenShifts hours). 
   forbiddenShifts = Dict{Int, Array{Int, 1}}() # (s -> ls): if shift s is worked, then the shifts in ls may not (irrespective of team).
   for s in 1:nShifts
     ls = Int[]
 
-    # Time between shifts.
-    for i in 1:timeBetweenShifts
-      if s + i <= nShifts
-        push!(ls, s + i)
+    # Compare to the beginnings of the next shifts. Stop adding shifts once the start is further away than timeBetweenShifts. 
+    for t in (s + 1):nShifts
+      if hour(neededTeamsForShifts[t][1] - neededTeamsForShifts[s][1]) < timeBetweenShifts
+        push!(ls, t)
+      else
+        break
       end
-    end
+    end 
 
     if length(ls) > 0
       forbiddenShifts[s] = unique(ls)
     end
   end
 
-  # List of periods where there must be two consecutive days off. Each period is given as a pair of the first and the last
-  # day of the period where the consecutive days off must be.
-  # TODO: For the tests, ensure each day is within the optimisation horizon.
-  nDaysOffPeriods = floor(Int, nDays / consecutiveDaysOff[2]) # Only complete periods (hence floor).
-  # consecutiveDaysOffPeriods = [(consecutiveDaysOff[2] * (w - 1) + 1, consecutiveDaysOff[2] * w) for w in 1:nDaysOffPeriods] # Write the constraint once per period, between the first and the last day of each (complete) period.
-  consecutiveDaysOffPeriods = [(i, i + consecutiveDaysOff[2]) for i in 1:(nDays - consecutiveDaysOff[2])] # Write the constraint as a rolling horizon.
-  if length(consecutiveDaysOffPeriods) == 0
-    error("Optimisation horizon not long enough to implement a days-off constraint: only " * string(nDays) * " days, while the constraint works with horizons of " * string(consecutiveDaysOff[2]) * " days.")
-  end
-
-  # Determine what is night and what is day. First and third shifts are night. (Considering the shifts start at midnight,
-  # last for 8 hours; night hours are 22-6; a shift having one night hour is considered as a night shift.)
-  days = [shiftsPerDay * (day - 1) + 2 for day in 1:nDays]
-  nights = [[shiftsPerDay * (day - 1) + 1 for day in 1:nDays] [shiftsPerDay * (day - 1) + 3 for day in 1:nDays]]
-
-
   ## Actual model.
   m = Model(solver=solver)
 
   # Main part of the model.
-  @variable(m, teamInShift[1:nTeams, 1:nShifts], Bin) # x
-  @variable(m, teamInTuple[1:nTeams, 1:nDays], Bin) # y
-  @variable(m, teamSlackOvertimeHours[1:nTeams, 1:nWeeks] >= 0)
+  @variable(m, teamInShift[1:nTeams, 1:nShifts], Bin) 
+  @variable(m, teamInTuple[1:nTeams, tupleDays], Bin) 
+  @variable(m, teamSlackOvertimeHours[1:nTeams, weeks] >= 0)
   @variable(m, teamSlackMinOverallHours[1:nTeams] >= 0) # Not per week, but over the whole period.
   @variable(m, teamSlackMaxOverallHours[1:nTeams] >= 0) # Not per week, but over the whole period.
 
-  @constraint(m, c_numberTeamsPerShift[s=1:nShifts],                                       sum(teamInShift[:, s]) == neededTeamsForShifts[s])
-  @constraint(m, c_forbiddenShiftCombinations[s=keys(forbiddenShifts), i=1:nTeams],        sum([teamInShift[i, j] for j in forbiddenShifts[s]]) <= 1 - teamInShift[i, s])
-  @constraint(m, c_maxHoursPerWeek[w=1:nWeeks, i=1:nTeams],                                hoursPerShift * sum(sum(teamInShift[i, j] for j in weeks[w])) <= maxHoursPerWeek + teamSlackOvertimeHours[i, w])
-  @constraint(m, c_minHoursOverall[i=1:nTeams],                                            hoursPerShift * sum(sum(teamInShift[i, :])) >= boundsHours[1] - teamSlackMinOverallHours[i])
-  @constraint(m, c_maxHoursOverall[i=1:nTeams],                                            hoursPerShift * sum(sum(teamInShift[i, :])) <= boundsHours[2] + teamSlackMaxOverallHours[i])
-  @constraint(m, c_detectWorkedPairsDays_divide[t=1:(nDays - 1), i=1:nTeams],              teamInTuple[i, t] <= 1 - sum(sum(teamInShift[i, j] for j in tupleDays[t])) / partialShiftsPerPeriod)
-  # @constraint(m, c_detectWorkedPairsDays_multiply[t=1:(nDays - 1), i=1:nTeams],            partialShiftsPerPeriod * teamInTuple[i, t] <= partialShiftsPerPeriod - sum([teamInShift[i, j] for j in tupleDays[t]]))
-  # @constraint(m, c_detectWorkedPairsDays_naivebigm_divide[t=1:(nDays - 1), i=1:nTeams],    teamInTuple[i, t] <= 1 - sum([teamInShift[i, j] for j in tupleDays[t]]) / nShifts)
-  # @constraint(m, c_detectWorkedPairsDays_naivebigm_multiply[t=1:(nDays - 1), i=1:nTeams],  nShifts * teamInTuple[i, t] <= nShifts - sum([teamInShift[i, j] for j in tupleDays[t]]))
-  @constraint(m, c_consecutiveDaysOff[i=1:nTeams, p=consecutiveDaysOffPeriods],            sum(sum(teamInTuple[i, p[1]:p[2]])) >= 1)
-  @constraint(m, c_canWorkNight[i=1:nTeams, s=nights; ! canWorkNights[i]],                 teamInShift[i, s] == 0)
-  @constraint(m, c_canWorkDay[i=1:nTeams, s=days; ! canWorkDays[i]],                       teamInShift[i, s] == 0)
+  @constraint(m, c_numberTeamsPerShift[s=1:nShifts],                                 sum(teamInShift[:, s]) == neededTeamsForShifts[s][3])
+  @constraint(m, c_forbiddenShiftCombinations[s=keys(forbiddenShifts), i=1:nTeams],  sum([teamInShift[i, j] for j in forbiddenShifts[s]]) <= 1 - teamInShift[i, s])
+  @constraint(m, c_maxHoursPerWeek[w=weeks, i=1:nTeams],                             sum(neededTeamsForShifts[s][2].value * teamInShift[i, s] for s in weekToShifts[w]) <= maxHoursPerWeek + teamSlackOvertimeHours[i, w])
+  @constraint(m, c_minHoursOverall[i=1:nTeams],                                      sum(neededTeamsForShifts[s][2].value * teamInShift[i, s] for s in 1:nShifts) >= boundsHours[1] - teamSlackMinOverallHours[i])
+  @constraint(m, c_maxHoursOverall[i=1:nTeams],                                      sum(neededTeamsForShifts[s][2].value * teamInShift[i, s] for s in 1:nShifts) <= boundsHours[2] + teamSlackMaxOverallHours[i])
+  @constraint(m, c_detectWorkedPairsDays[d=tupleDays, i=1:nTeams],                   nShifts * teamInTuple[i, d] <= nShifts - sum([teamInShift[i, s] for s in tupleDayToShifts[d]]))
+  @constraint(m, c_consecutiveDaysOff[i=1:nTeams, lt=offTupleDays],                  sum(teamInTuple[i, d] for d in lt) >= 1)
 
-  # TODO: Cut? One shift per day max. No more valid with variable shift lengths... (4-hour shift + 11-hour rest < 24-hour day)
+  # TODO: Cut? One shift per day max, due to the fact that two shifts must be timeBetweenShifts hours apart (think: 11h). No more valid with variable shift lengths... (4-hour shift + 11-hour rest < 24-hour day)
 
-  # Implement the fixed schedule if need be.
-  if length(fixedSchedule) > 0
-    # First, copy the schedule so that its length fits the needed one.
-    # TODO: When refactoring this as a constraint, let external user code deal with this part. (When the schedule is given for 10 days, workers do not start at the same position in the pattern for every period of 13 weeks.)
-    # TODO: Generalise to have "definitely never", "yes, of course", "avoid as long as possible" (generalises day/night teams?).
-    fixedScheduleCopied = hcat([fixedSchedule for i in 1:ceil(Int, nShifts / size(fixedSchedule, 2))]...)[:, 1:nShifts]
+  # TODO: How to do this now? Only conditionnally acceptable: if fully flexible, this does not make sense! Only allowed when shifts have a fixed length. (To be done when factorising this function to use constraint objects as parameters?)
+  # # Implement the fixed schedule if need be.
+  # if length(fixedSchedule) > 0
+  #   # First, copy the schedule so that its length fits the needed one.
+  #   # TODO: When refactoring this as a constraint, let external user code deal with this part. (When the schedule is given for 10 days, workers do not start at the same position in the pattern for every period of 13 weeks.)
+  #   # TODO: Generalise to have "definitely never", "yes, of course", "avoid as long as possible" (generalises day/night teams?).
+  #   fixedScheduleCopied = hcat([fixedSchedule for i in 1:ceil(Int, nShifts / size(fixedSchedule, 2))]...)[:, 1:nShifts]
 
-    # Then, the constraint is straightforward.
-    @constraint(m, c_fixedSchedule[i=1:nTeams, s=1:nShifts],                               teamInShift[i, s] <= fixedScheduleCopied[i, s])
-  end
+  #   # Then, the constraint is straightforward.
+  #   @constraint(m, c_fixedSchedule[i=1:nTeams, s=1:nShifts],                               teamInShift[i, s] <= fixedScheduleCopied[i, s])
+  # end
 
   # Handle initial solutions, if any.
   @variable(m, initialSolutionDifference >= 0, Int)
@@ -151,131 +186,33 @@ function teamModel(neededTeamsForShifts::Array{Int, 1}, hoursPerShift::Int, time
 
   # Implement fairness criteria, if needed (they may have a large detrimental effect on the model performance).
   @variable(m, unfairnessNumberShifts)
+  @variable(m, unfairnessNumberHours)
+
   if coeffs[5] == 0.
     @constraint(m, c_unfairnessNumberShifts,                                              unfairnessNumberShifts == 0.)
   else
-    formulation = :integer # :standard, :integer, :lattice
+    @variable(m, numberShifts[1:nTeams] >= 0, Int)
+    @variable(m, unfairnessNumberShiftsPositive[1:nTeams] >= 0, Int)
+    @variable(m, unfairnessNumberShiftsNegative[1:nTeams] >= 0, Int)
 
-    if formulation == :standard
-      @variable(m, numberShifts[1:nTeams] >= 0, Int)
-      @variable(m, unfairnessNumberShiftsPositive[1:nTeams] >= 0) # Real number.
-      @variable(m, unfairnessNumberShiftsNegative[1:nTeams] >= 0) # Real number.
-      averageNumberShifts = sum(neededTeamsForShifts) / nTeams
+    @constraint(m, c_positiveUnfairnessShifts,                                          unfairnessNumberShifts >= 0)
+    @constraint(m, c_numberShifts[i=1:nTeams],                                          numberShifts[i] == sum(teamInShift[i, :]))
+    @constraint(m, c_unfairnessNumberShifts,                                            nTeams * unfairnessNumberShifts == sum(unfairnessNumberShiftsPositive) + sum(unfairnessNumberShiftsNegative))
+    @constraint(m, c_differencesNumberShifts[i=1:nTeams],                               nTeams * numberShifts[i] == nShifts + unfairnessNumberShiftsPositive[i] - unfairnessNumberShiftsNegative[i])
+    # See hr_lattice.jl for current developments about a lattice reformulation. 
+  end
+  
+  if coeffs[6] == 0.
+    @constraint(m, c_unfairnessNumberHours,                                              unfairnessNumberHours == 0.)
+  else
+    @variable(m, numberHours[1:nTeams] >= 0, Int)
+    @variable(m, unfairnessNumberHoursPositive[1:nTeams] >= 0, Int)
+    @variable(m, unfairnessNumberHoursNegative[1:nTeams] >= 0, Int)
 
-      @constraint(m, c_positiveUnfairness,                                                unfairnessNumberShifts >= 0)
-      @constraint(m, c_numberShifts[i=1:nTeams],                                          numberShifts[i] == sum(teamInShift[i, :]))
-      @constraint(m, c_unfairnessNumberShifts,                                            nTeams * unfairnessNumberShifts == sum(unfairnessNumberShiftsPositive) + sum(unfairnessNumberShiftsNegative))
-      @constraint(m, c_differencesNumberShifts[i=1:nTeams],                               numberShifts[i] == averageNumberShifts + unfairnessNumberShiftsPositive[i] - unfairnessNumberShiftsNegative[i])
-    elseif formulation == :integer
-      @variable(m, numberShifts[1:nTeams] >= 0, Int)
-      @variable(m, unfairnessNumberShiftsPositive[1:nTeams] >= 0, Int)
-      @variable(m, unfairnessNumberShiftsNegative[1:nTeams] >= 0, Int)
-      totalNumberShifts = sum(neededTeamsForShifts)
-
-      @constraint(m, c_positiveUnfairness,                                                unfairnessNumberShifts >= 0)
-      @constraint(m, c_numberShifts[i=1:nTeams],                                          numberShifts[i] == sum(teamInShift[i, :]))
-      @constraint(m, c_unfairnessNumberShifts,                                            nTeams * unfairnessNumberShifts == sum(unfairnessNumberShiftsPositive) + sum(unfairnessNumberShiftsNegative))
-      @constraint(m, c_differencesNumberShifts[i=1:nTeams],                               nTeams * numberShifts[i] == totalNumberShifts + unfairnessNumberShiftsPositive[i] - unfairnessNumberShiftsNegative[i])
-    elseif formulation == :lattice
-      @variable(m, unfairnessNumberShiftsPerTeam[1:nTeams])
-      @constraint(m, unfairnessNumberShifts == sum(unfairnessNumberShiftsPerTeam))
-
-      # Build the constraint matrix for these constraints.
-      M1 = 10_000 # Completing the identity matrix with the right-hand side
-      M2 = 10_000 # Constraint coefficients
-      M3 = 10 # Slack variables
-      totalNumberShifts = 12 # sum(neededTeamsForShifts)
-
-      nVars = nTeams * nShifts + nTeams
-      nConstrs = nTeams
-      A = zeros(Int, nVars + nConstrs + 1, nVars + 1)
-      A[1:nVars, 1:nVars] = eye(Int, nVars)
-      A[nVars + 1, nVars + 1] = M1
-      for teamIdx in 1:nTeams
-        # nTeams * numberShifts[i] == totalNumberShifts + unfairnessNumberShiftsPositive[i] - unfairnessNumberShiftsNegative[i]
-        # First nTeams * nShifts teamInShift (hence numberShifts), then nTeams unfairnessNumberShifts
-        A[nVars + 1 + teamIdx, (teamIdx - 1) * nShifts + 1 : teamIdx * nShifts] = M2 * nTeams # teamInShift
-        A[nVars + 1 + teamIdx, nTeams * nShifts + teamIdx] = M2 * M3 # slack
-        A[nVars + 1 + teamIdx, end] = - M2 * totalNumberShifts
-      end
-
-      # Perform the LLL decomposition.
-      S = MatrixSpace(ZZ, size(A, 2), size(A, 1))
-      B = lll(S(A'))'; # [B[i, j] for i in 1:size(B, 1), j in 1:size(B, 2)]
-
-      # Solutions to the homogeneous equation (Nemo does not allow ranges, hence the transpositions):
-      pIdx = find([all([B[j, i] == 0 for j in size(B, 1) - nConstrs + 1:size(B, 1)]) for i in 1:size(B, 2)])
-      # Solution to the nonhomogeneous equation:
-      qIdx = find([B[size(B, 1) - nConstrs + 1, i] == M1 && all([B[j, i] == 0 for j in size(B, 1) - nConstrs + 2:size(B, 1)]) for i in 1:size(B, 2)])
-
-      # Ensure there are no two identical basis vectors.
-      filter!(pIdx) do p
-        # Always keep the first vector (no other one to compare it to).
-        if p == pIdx[1]
-          return true
-        end
-
-        # Compare the current vector to all the previous ones.
-        idx = find(pIdx .== p)[1]
-        for otherIdx in pIdx[1 : idx - 1]
-          if norm(Int[B[i, idx] for i in 1:nVars] - Int[B[i, otherIdx] for i in 1:nVars]) <= 1.e-5
-            # Found a vector that is identical (working only with integers) in the beginning of the basis: reject this one.
-            return false
-          end
-        end
-
-        # No similar vector found: keep this one!
-        return true
-      end
-
-      # Due to the form the reduced basis, there is no basis vector after the nonhomogeneous solution.
-      # Expected form: first all the basis vectors, then the nonhomogeneous solution, then useless lattice basis vectors.
-      # This has a large impact on the consistency tests performed just after.
-      if length(qIdx) > 0
-        filter!((p) -> p < minimum(qIdx), pIdx)
-      end
-
-      # Consistency tests for the basis decomposition (if there is a problem here, other values of M should be tried).
-      if length(pIdx) != nVars - nConstrs
-        warn("Not the right number of vectors in the reduced basis: ", length(pIdx), " instead of ", nVars - nConstrs, ".")
-        println(pIdx)
-      end
-      if length(qIdx) != 1
-        warn("Not the right number of nonhomogeneous solutions: ", length(qIdx), " obtained instead of exactly 1.")
-
-        # Keep the first nonhomogeneous solution if there are multiple ones (arbitrarily).
-        if length(qIdx) > 1
-          qIdx = minimum(qIdx)
-        end
-      end
-
-      q = Int[B[i, j] for i in 1:nVars, j in qIdx]
-      p = Int[B[i, j] for i in 1:nVars, j in pIdx]
-
-      if length(qIdx) == 0
-        warn("Determining a nonhomogeneous solution.")
-
-        # Build the solution team per team, as the constraints only involve one team at a time.
-        q = zeros(Int, nVars)
-        for teamIdx in 1:nTeams
-          # sum of M2 * nTeams * teamInShift, then M2 * unfairness == M2 * totalNumberShifts
-          # Fill as many teamInShift at the beginning of the vector. Then, put the rest in the unfairness. (Be general,
-          # in case the code is used when multiple teams are required for a given shift.)
-          consideredShifts = min(totalNumberShifts, nShifts)
-          nSurplusShifts = mod(consideredShifts, nTeams)
-          nTeamInShift = floor(Int, (consideredShifts - nSurplusShifts) / nTeams)
-          nShiftsUnfairness = totalNumberShifts - nTeams * nTeamInShift
-
-          q[(teamIdx - 1) * nShifts + 1 : (teamIdx - 1) * nShifts + nTeamInShift] = 1
-          q[nTeams * nShifts + teamIdx] = nShiftsUnfairness / M3
-        end
-      end
-
-      # Write the new constraints.
-      @variable(m, lambda[1:size(p, 2)], Int)
-      @constraint(m, c_differencesNumberShiftsA[i=1:nTeams, t=1:nShifts],                 teamInShift[i, t] == q[nTeams * (i - 1) + t + 1] + dot(lambda, vec(p[nTeams * (i - 1) + t + 1, :])))
-      @constraint(m, c_differencesNumberShiftsB[i=1:nTeams],                              unfairnessNumberShiftsPerTeam[i] == q[nTeams * nTeams + i] + dot(lambda, vec(p[nTeams * nTeams + i, :])))
-    end
+    @constraint(m, c_positiveUnfairnessHours,                                          unfairnessNumberHours >= 0)
+    @constraint(m, c_numberHours[i=1:nTeams],                                          numberHours[i] == sum(neededTeamsForShifts[s][2].value * teamInShift[i, s] for s in 1:nShifts))
+    @constraint(m, c_unfairnessNumberHours,                                            nTeams * unfairnessNumberHours == sum(unfairnessNumberHoursPositive) + sum(unfairnessNumberHoursNegative))
+    @constraint(m, c_differencesNumberHours[i=1:nTeams],                               nTeams * numberHours[i] == nWorkedHours + unfairnessNumberHoursNegative[i] - unfairnessNumberHoursNegative[i])
   end
 
   # Finally, the objective function.
@@ -283,7 +220,8 @@ function teamModel(neededTeamsForShifts::Array{Int, 1}, hoursPerShift::Int, time
                    + coeffs[2] * sum(teamSlackMaxOverallHours)
                    + coeffs[3] * sum(teamSlackOvertimeHours)
                    + coeffs[4] * initialSolutionDifference
-                   + coeffs[5] * unfairnessNumberShifts)
+                   + coeffs[5] * unfairnessNumberShifts
+                   + coeffs[6] * unfairnessNumberHours)
 
   # Solve and propose services around the model.
   # writeLP(m, outfile, genericnames=false)
@@ -291,21 +229,22 @@ function teamModel(neededTeamsForShifts::Array{Int, 1}, hoursPerShift::Int, time
   println(status)
 
   if status != :Infeasible && status != :Unbounded && status != :InfeasibleOrUnbounded && status != :Error
-    # When a slack variable has a zero cost in the objective function, its value is arbitrary
+    # When a slack variable has a zero cost in the objective function, its value is arbitrary: 
+    # force it to be meaningful (i.e. zero). 
     hrSlackMin = (coeffs[1] == 0.) ? 0. : getvalue(teamSlackMinOverallHours)
     hrSlackMax = (coeffs[2] == 0.) ? 0. : getvalue(teamSlackMaxOverallHours)
     hrSlackOver = (coeffs[3] == 0.) ? 0. : getvalue(teamSlackOvertimeHours)
     hrInitialSolDelta = (coeffs[4] == 0.) ? 0. : getvalue(initialSolutionDifference)
-    hrUnfair = (coeffs[5] == 0.) ? 0. : getvalue(unfairnessNumberShifts)
+    hrUnfairShifts = (coeffs[5] == 0.) ? 0. : getvalue(unfairnessNumberShifts)
+    hrUnfairHours = (coeffs[6] == 0.) ? 0. : getvalue(unfairnessNumberHours)
 
-    return true, m, getvalue(teamInShift), getvalue(teamInShiftDifferentLess), getvalue(teamInShiftDifferentMore),
-           getobjectivevalue(m),
-           hrSlackMin, hrSlackMax, hrSlackOver, hrInitialSolDelta, hrUnfair
+    return HRModelResults(m, getvalue(teamInShift), 
+                          getobjectivevalue(m), hrInitialSolDelta, getvalue(teamInShiftDifferentLess), getvalue(teamInShiftDifferentMore), 
+                          hrSlackMin, hrSlackMax, hrSlackOver, hrUnfairShifts, hrUnfairHours)
   else
     if length(outfile) > 0
       writeLP(m, outfile, genericnames=false)
     end
-    return false, m, Bool[], Bool[], Bool[],
-           0.0, Float64[], Float64[], Float64[], 0.0, 0.0
+    return HRModelResults(m)
   end
 end

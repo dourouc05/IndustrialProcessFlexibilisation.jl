@@ -9,6 +9,8 @@ As such, this package provides an objective way of evaluating the impact of flex
 To install: 
     
     Pkg.clone("https://github.com/dourouc05/IndustrialProcessFlexibilisation.jl")
+    
+See the example in the `docs/examples` folder, albeit it is not 100% working at the time. 
 
 Some results have been presented at the [COMEX workshop](http://orbi.ulg.ac.be/handle/2268/207330) and at the [IFORS 2017 conference](http://orbi.ulg.ac.be/handle/2268/207330). 
 

@@ -34,13 +34,13 @@ struct ProductionModelResults
   plantModel::PlantModel
 
   shiftsOpenRaw::Array{Bool, 1}
-  shiftsOpen::Array{Tuple{DateTime, Hour, Int}, 1} # TODO: make a specific data structure with dedicated operations? Would guarantee invariants as checked at the beginning of model/hr.jl:teamModel; other operations of this function would be simplified. Could make this data structure easier to evolve (two full teams are probably not needed if two machines are to be operated, depending on the plant). 
+  shiftsOpen::Array{Tuple{DateTime, Hour, Int}, 1} # TODO: make a specific data structure with dedicated operations? Would guarantee invariants as checked at the beginning of model/hr.jl:teamModel; other operations of this function would be simplified. Could make this data structure easier to evolve (two full teams are probably not needed if two machines are to be operated, depending on the plant). In this case, this data structure would remove the raw field. 
 
   productionPlanOutput::Array{Float64, 2}
 
   # Infeasible constructor. 
   function ProductionModelResults(model::Model, plantModel::PlantModel)
-    return new(false, model, plantModel, Bool[], Tuple{DateTime, Hour}[], Float64[])
+    return new(false, model, plantModel, Bool[], Tuple{DateTime, Hour}[], zeros(Float64, 0, 0))
   end
 
   # Feasible constructor

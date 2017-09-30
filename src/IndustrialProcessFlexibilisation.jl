@@ -37,6 +37,7 @@ module IndustrialProcessFlexibilisation
          objectiveTimeStep, objectiveShift, objective, objectives, symbols, weights, weight, nObjectives, objectiveObject, objective, symbol, weight, nonzeroObjectives, hasObjective, electricityPrice, hrPrice,
          timing, shifts, shiftOpen, shiftOpen, timeStepOpen,
          plant, timingModel, equipmentModels, flowModels, orderBookModel, equipmentModel, flowModel, nEquipments
+  export ProductionModelResults, HRModelResults
 
 
 

@@ -27,9 +27,6 @@ function productionModel(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts
   if status != :Infeasible && status != :Unbounded && status != :Error
     shiftsOpen = [round(Bool, round(Int, getvalue(shiftOpen(timingModel(pm), d)))) for d in timeBeginning(pm) : shiftDurationsStep(pm) : timeEnding(pm)] 
     productionRaw = getvalue(quantity(equipmentModel(pm, "out"))) # TODO: In PlantModel, link to the variables of each subobject model? Define quantity() and others on the plant model? Or just a subset?
-    println("=========")
-    println(shiftsOpen)
-    println("=========")
     return ProductionModelResults(m, pm, shiftsOpen, shiftsAgregation(shiftsOpen, timing, shifts, solver), productionRaw)
   else
     if length(outfile) > 0

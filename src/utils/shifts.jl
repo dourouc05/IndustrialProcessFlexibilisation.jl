@@ -38,14 +38,21 @@ function shiftsAgregation(shiftsOpenRaw::Array{Bool, 1}, timing::Timing, shifts:
       push!(shiftsOpen, sol)
     else # Too long: cut it into pieces. 
       # Have pieces that are as alike to each other as possible, but not too many pieces either. 
-      # Could probably write an algorithm for this, but let's use an optimisation solver (ensured to be available here). 
-      # After all, it's a figth-generation programming language! 
+      # Could probably write an algorithm for this, but let's use an optimisation solver (ensured to be available). 
+      # After all, MIP is a figth-generation programming language! 
+      maxNShifts = ceil(Int, sol[2].value / minimumShiftDurations(shifts).value)
+      minNShifts = ceil(Int, sol[2].value / maximumShiftDurations(shifts).value)
+
       m = Model(solver=solver)
       @variable(m, n[1:nShiftDurations(shifts)] >= 0, Int)
-      @variable(m, slack[1:nShiftDurations(shifts)] >= 0)
+      @variable(m, nUsed[1:nShiftDurations(shifts)], Bin) # Avoid solutions like 8+4, prefer 6+6. 
+      @variable(m, slackPlus[1:nShiftDurations(shifts)] >= 0)
+      @variable(m, slackMinus[1:nShiftDurations(shifts)] >= 0)
       @constraint(m, dot(n, map(d -> d.value, shiftDurations(shifts))) == sol[2].value)
-      @constraint(m, c[i=1:nShiftDurations(shifts)], n[i] * shiftDurations(shifts)[i].value + slack[i] == maximumShiftDurations(shifts))
-      @objective(m, Min, sum(slackPlus) + sum(slackMinus) + 10 * sum(n))
+      @constraint(m, sum(n) <= maxNShifts)
+      @constraint(m, c[i=1:nShiftDurations(shifts)], n[i] * shiftDurations(shifts)[i].value + slackPlus[i] - slackMinus[i] == sol[2].value / minNShifts) 
+      @constraint(m, d[i=1:nShiftDurations(shifts)], n[i] <= maxNShifts * nUsed[i]) 
+      @objective(m, Min, sum(slackPlus) + sum(slackMinus) + 10 * sum(n) + 10 * sum(nUsed))
       solve(m)
 
       start = sol[1]

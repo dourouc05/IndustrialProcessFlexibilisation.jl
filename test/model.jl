@@ -8,44 +8,45 @@
         m = Model(solver=CbcSolver(logLevel=0))
         hrm = TimingModel(m, t, s)
 
-        @test(timing(hrm) == t)
-        @test(timeBeginning(hrm) == timeBeginning(t))
-        @test(timeHorizon(hrm) == timeHorizon(t))
-        @test(timeEnding(hrm) == timeEnding(t))
-        @test(timeStepDuration(hrm) == timeStepDuration(t))
-        @test(shiftBeginning(hrm) == shiftBeginning(s))
-        @test(shiftDuration(hrm) == shiftDuration(s))
-        @test(shiftDurations(hrm) == shiftDurations(s))
-        @test(shiftDurationsStart(hrm) == shiftDurationsStart(s))
-        @test(shiftDurationsStep(hrm) == shiftDurationsStep(s))
-        @test(shiftDurationsStop(hrm) == shiftDurationsStop(s))
+        @test timing(hrm) == t
+        @test timeBeginning(hrm) == timeBeginning(t)
+        @test timeHorizon(hrm) == timeHorizon(t)
+        @test timeEnding(hrm) == timeEnding(t)
+        @test timeStepDuration(hrm) == timeStepDuration(t)
+        @test shiftBeginning(hrm) == shiftBeginning(s)
+        @test shiftDuration(hrm) == shiftDuration(s)
+        @test shiftDurations(hrm) == shiftDurations(s)
+        @test shiftDurationsStart(hrm) == shiftDurationsStart(s)
+        @test shiftDurationsStep(hrm) == shiftDurationsStep(s)
+        @test shiftDurationsStop(hrm) == shiftDurationsStop(s)
+        @test nShiftDurations(hrm) == nShiftDurations(s)
 
-        @test(nTimeSteps(hrm) == 48)
-        @test(nTimeSteps(hrm, Minute(15)) == 1) # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
-        @test(nTimeSteps(hrm, Day(1)) == 24)
-        @test(nTimeStepsPerShift(hrm) == [8]) # Only one shift length available, hence a singleton (but not a scalar).
-        @test(nShifts(hrm) == 6)
+        @test nTimeSteps(hrm) == 48
+        @test nTimeSteps(hrm, Minute(15)) == 1 # Something that lasts 15 minutes has to be represented as one time step here (even though it is much shorter than one hour).
+        @test nTimeSteps(hrm, Day(1)) == 24
+        @test nTimeStepsPerShift(hrm) == [8] # Only one shift length available, hence a singleton (but not a scalar).
+        @test nShifts(hrm) == 6
 
         @test_throws(ErrorException, dateToTimeStep(hrm, date - Hour(1)))
-        @test(dateToTimeStep(hrm, date) == 1)
-        @test(dateToTimeStep(hrm, date + Minute(15)) == 1)
-        @test(dateToTimeStep(hrm, date + Hour(1)) == 2)
-        @test(dateToTimeStep(hrm, date + Hour(8)) == 9) # One shift.
-        @test(dateToTimeStep(hrm, date + Hour(47)) == 48) # Optimisation horizon.
+        @test dateToTimeStep(hrm, date) == 1
+        @test dateToTimeStep(hrm, date + Minute(15)) == 1
+        @test dateToTimeStep(hrm, date + Hour(1)) == 2
+        @test dateToTimeStep(hrm, date + Hour(8)) == 9 # One shift.
+        @test dateToTimeStep(hrm, date + Hour(47)) == 48 # Optimisation horizon.
 
         @test_throws(ErrorException, dateToShift(hrm, date - Hour(1)))
-        @test(dateToShift(hrm, date) == 1)
-        @test(dateToShift(hrm, date + Hour(5)) == 1)
-        @test(dateToShift(hrm, date + Hour(7)) == 1)
-        @test(dateToShift(hrm, date + Hour(8)) == 2)
-        @test(dateToShift(hrm, date + Hour(12)) == 2)
+        @test dateToShift(hrm, date) == 1
+        @test dateToShift(hrm, date + Hour(5)) == 1
+        @test dateToShift(hrm, date + Hour(7)) == 1
+        @test dateToShift(hrm, date + Hour(8)) == 2
+        @test dateToShift(hrm, date + Hour(12)) == 2
 
         # Optimisation variable accessors.
-        @test(shiftOpen(hrm, 1) == hrm.shiftOpen[1])
+        @test shiftOpen(hrm, 1) == hrm.shiftOpen[1]
 
-        @test(timeStepOpen(hrm, date) == shiftOpen(hrm, 1))
-        @test(timeStepOpen(hrm, date + Minute(15)) == shiftOpen(hrm, 1))
-        @test(timeStepOpen(hrm, date + Hour(15)) == shiftOpen(hrm, 2))
+        @test timeStepOpen(hrm, date) == shiftOpen(hrm, 1)
+        @test timeStepOpen(hrm, date + Minute(15)) == shiftOpen(hrm, 1)
+        @test timeStepOpen(hrm, date + Hour(15)) == shiftOpen(hrm, 2)
       end
 
       @testset "Beginning of the shifts is four hours before the optimisation" begin
@@ -56,11 +57,11 @@
         hrm = TimingModel(m, t, s)
 
         @test_throws(ErrorException, dateToShift(hrm, date - Hour(4) - Hour(1)))
-        @test(dateToShift(hrm, date - Hour(4)) == 1)
-        @test(dateToShift(hrm, date - Hour(4) + Hour(5)) == 1)
-        @test(dateToShift(hrm, date - Hour(4) + Hour(7)) == 1)
-        @test(dateToShift(hrm, date - Hour(4) + Hour(8)) == 2)
-        @test(dateToShift(hrm, date - Hour(4) + Hour(12)) == 2)
+        @test dateToShift(hrm, date - Hour(4)) == 1
+        @test dateToShift(hrm, date - Hour(4) + Hour(5)) == 1
+        @test dateToShift(hrm, date - Hour(4) + Hour(7)) == 1
+        @test dateToShift(hrm, date - Hour(4) + Hour(8)) == 2
+        @test dateToShift(hrm, date - Hour(4) + Hour(12)) == 2
       end
     end
 
@@ -1202,56 +1203,100 @@
   end
 
   @testset "Production model" begin
-    e1 = Equipment("EAF", :eaf)
-    e2 = Equipment("LF", :lf)
-    e3 = Equipment("CC", :cc)
-    r1 = NormalRoute(e1, e2)
-    r2 = NormalRoute(e2, e3)
-    le = [e1, e2, e3]
-    lr = Route[r1, r2]
-    p = Plant(le, lr)
+    @testset "Results data structures" begin
+      e1 = Equipment("EAF", :eaf)
+      e2 = Equipment("LF", :lf)
+      r1 = NormalRoute(e1, e2)
+      le = [e1, e2]
+      lr = Route[r1]
+      p = Plant(le, lr)
 
-    c = ConstantConsumption(2.0)
-    p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
-    p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
-    ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
+      c = ConstantConsumption(2.0)
+      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2]]))
+      ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.)))
 
-    date = DateTime(2017, 01, 01, 08)
-    t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
-    s = Shifts(t, date, Hour(8))
+      date = DateTime(2017, 01, 01, 08)
+      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+      s = Shifts(t, date, Hour(8))
 
-    epDates = collect(date:Hour(1):date + Week(5))
-    ep = TimeArray(epDates, 50 + 10 * sin.(1:length(epDates)) + rand(length(epDates)))
+      epDates = collect(date:Hour(1):date + Week(5))
+      ep = TimeArray(epDates, 50 + 10 * sin.(1:length(epDates)) + rand(length(epDates)))
+      o = EnergyObjective(ep, t)
 
-    function hrp_test(d::DateTime)
-      base = 1000
+      m = Model()
+      pm = PlantModel(m, p, ob, t, s)
 
-      if hour(d) < 6 || hour(d) >= 22 # Night.
-        base *= 1.2
-      end
+      # First, build a failed result. 
+      failed = ProductionModelResults(m, pm)
 
-      if dayname(d) == "Sunday" # WE.
-        base *= 2
-      end
+      @test ! failed.feasibility 
+      @test failed.model == m
+      @test failed.plantModel == pm
 
-      return base
+      # Then, a successful one. (Only two time steps.)
+      production = zeros(Float64, 2, 1)
+      production[1, 1] = 50.
+      successful = ProductionModelResults(m, pm, [true, false], [(date, Hour(4), 1)], production)
+      
+      @test successful.feasibility 
+      @test successful.model == m
+      @test successful.plantModel == pm
+      @test successful.shiftsOpenRaw == [true, false]
+      @test successful.shiftsOpen == [(date, Hour(4), 1)]
+      @test successful.productionPlanOutput == production
     end
-    eo = EnergyObjective(ep, t)
-    hro = HRCostObjective(hrp_test)
-    o = ObjectiveCombination([eo, hro])
 
-    # The model should be built and solved without error.
-    pr = productionModel(p, ob, t, s, o, solver=CbcSolver(logLevel=0))
-    @test pr.feasibility
-    @test sum(pr.shiftsOpenRaw) == 1
-    @test length(pr.shiftsOpen) == 1
-    @test pr.shiftsOpen[1][1] >= timeBeginning(t)
-    @test pr.shiftsOpen[1][1] <= timeEnding(t)
-    @test pr.shiftsOpen[1][2] == Hour(8)
-    @test pr.shiftsOpen[1][3] == 1
-    @test size(pr.productionPlanOutput, 1) == 840
-    @test size(pr.productionPlanOutput, 2) == 1
-    @test sum(pr.productionPlanOutput) == 360
+    @testset "Basic use" begin
+      e1 = Equipment("EAF", :eaf)
+      e2 = Equipment("LF", :lf)
+      e3 = Equipment("CC", :cc)
+      r1 = NormalRoute(e1, e2)
+      r2 = NormalRoute(e2, e3)
+      le = [e1, e2, e3]
+      lr = Route[r1, r2]
+      p = Plant(le, lr)
+
+      c = ConstantConsumption(2.0)
+      p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+      p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+      ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 30) => (p2, 50.)))
+
+      date = DateTime(2017, 01, 01, 08)
+      t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+      s = Shifts(t, date, Hour(8))
+
+      epDates = collect(date:Hour(1):date + Week(5))
+      ep = TimeArray(epDates, 50 + 10 * sin.(1:length(epDates)) + rand(length(epDates)))
+
+      function hrp_test(d::DateTime)
+        base = 1000
+
+        if hour(d) < 6 || hour(d) >= 22 # Night.
+          base *= 1.2
+        end
+
+        if dayname(d) == "Sunday" # WE.
+          base *= 2
+        end
+
+        return base
+      end
+      eo = EnergyObjective(ep, t)
+      hro = HRCostObjective(hrp_test)
+      o = ObjectiveCombination([eo, hro])
+
+      pr = productionModel(p, ob, t, s, o, solver=CbcSolver(logLevel=0))
+      @test pr.feasibility
+      @test sum(pr.shiftsOpenRaw) == 1
+      @test length(pr.shiftsOpen) == 1
+      @test pr.shiftsOpen[1][1] >= timeBeginning(t)
+      @test pr.shiftsOpen[1][1] <= timeEnding(t)
+      @test pr.shiftsOpen[1][2] == Hour(8)
+      @test pr.shiftsOpen[1][3] == 1
+      @test size(pr.productionPlanOutput, 1) == 840
+      @test size(pr.productionPlanOutput, 2) == 1
+      @test sum(pr.productionPlanOutput) == 360
+    end
   end
 
   @testset "Team model" begin

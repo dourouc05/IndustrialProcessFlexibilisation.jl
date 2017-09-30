@@ -1260,6 +1260,28 @@
         solve(m)
         @test(getobjectivevalue(m) == 1.)
       end
+
+      @testset "Shifts being forced" begin
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+
+        # Dummy objective: first, try to minimise the assignment at a given shift (i.e. no team). 
+        # Second test: force this shift, same objective, see that it is not assigned. 
+        m = Model(solver=CbcSolver(logLevel=0))
+        hrm = TimingModel(m, t, s)
+        postConstraints(m, hrm)
+        @objective(m, Min, shiftOpen(hrm, date))
+        solve(m)
+        @test(getobjectivevalue(m) == 0.)
+        
+        m = Model(solver=CbcSolver(logLevel=0))
+        hrm = TimingModel(m, t, s)
+        postConstraints(m, hrm, [(date, Hour(8), 1)])
+        @objective(m, Min, shiftOpen(hrm, date))
+        solve(m)
+        @test(getobjectivevalue(m) == 1.)
+      end
     end
   end
 

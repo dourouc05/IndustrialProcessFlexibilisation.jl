@@ -150,7 +150,7 @@ nEquipments(pm::PlantModel) = length(equipmentModels(pm))
 # Link to the methods of Timing.
 timeBeginning(pm::PlantModel) = timeBeginning(timing(pm))
 timeHorizon(pm::PlantModel) = timeHorizon(timing(pm))
-timeEnding(pm::PlantModel) = timeEnding(timing(pm)) # TODO: To test!
+timeEnding(pm::PlantModel) = timeEnding(timing(pm)) 
 timeStepDuration(pm::PlantModel) = timeStepDuration(timing(pm))
 
 nTimeSteps(pm::PlantModel, d::Period) = nTimeSteps(timing(pm), d) 
@@ -175,7 +175,8 @@ dates(pm::PlantModel) = dates(orderBook(pm))
 products(pm::PlantModel) = products(orderBook(pm))
 nProducts(pm::PlantModel) = nProducts(orderBook(pm))
 dueBy(pm::PlantModel, dt::DateTime; kwargs...) = dueBy(orderBook(pm), dt; kwargs...)
-fromto(pm::PlantModel, from::DateTime, to::DateTime) = fromto(orderBook(pm), from, to)
+# No fromto: what should it return? A new order book or a new PlantModel object? What happens to the constraints added into the model? 
+# The best is to leave it out: don't allow altering such objects once the model is built (done by the constructor, at leats partially). 
 productIds(pm::PlantModel) = productIds(orderBook(pm))
 productId(pm::PlantModel, p::Product) = productId(orderBook(pm), p)
 productFromId(pm::PlantModel, i::Int) = productFromId(orderBook(pm), i)

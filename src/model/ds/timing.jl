@@ -54,6 +54,6 @@ function postConstraints(m::Model, hr::TimingModel, forcedShifts::Array{Tuple{Da
 
   # Some shifts have already been decided previously.
   for tuple in 1:length(forcedShifts)
-    @constraint(m, shiftOpen(hr, tuple[1]) == 1) # TODO: Rewrite forcedShifts as a more common data structure for this (with DateTime rather than indices).
+    @constraint(m, shiftOpen(hr, tuple[1]) == 1) 
   end
 end

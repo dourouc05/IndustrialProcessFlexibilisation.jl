@@ -1047,9 +1047,6 @@
         p = Plant(le, lr)
 
         c = ConstantConsumption(2.0)
-        e1 = Equipment("EAF", :eaf)
-        e2 = Equipment("LF", :lf)
-        e3 = Equipment("CC", :cc)
         p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
         p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
         ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 31) => (p2, 50.)))
@@ -1147,6 +1144,70 @@
         @test productId(pm, p2) == productId(ob, p2)
         @test productFromId(pm, 1) == productFromId(ob, 1)
         @test productFromId(pm, 2) == productFromId(ob, 2)
+      end
+      
+      @testset "Error case: missing equipment in the plant" begin
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        e3 = Equipment("CC", :cc) # Not in the plant, but used by the order book products. 
+        r1 = NormalRoute(e1, e2)
+        le = [e1, e2]
+        lr = Route[r1]
+        p = Plant(le, lr)
+
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+        p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c, e3 => c), Dict{Equipment, Tuple{Float64, Float64}}([e => (120.0, 150.0) for e in [e1, e2, e3]]))
+        ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 31) => (p2, 50.)))
+
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        @test_throws ErrorException PlantModel(m, p, ob, t, s)
+      end
+      
+      @testset "Error case: missing route in the plant (origin)" begin
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        r1 = NormalRoute(e1, e2)
+        le = [e1, e2]
+        lr = Route[r1]
+        p = Plant(le, lr)
+
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e2 => c), Dict{Equipment, Tuple{Float64, Float64}}(e2 => (120.0, 150.0))) # No e1: no path in -> e2!
+        p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e2 => c), Dict{Equipment, Tuple{Float64, Float64}}(e2 => (120.0, 150.0)))
+        ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 31) => (p2, 50.)))
+
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        @test_throws ErrorException PlantModel(m, p, ob, t, s)
+      end
+      
+      @testset "Error case: missing route in the plant (destination)" begin
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        r1 = NormalRoute(e1, e2)
+        le = [e1, e2]
+        lr = Route[r1]
+        p = Plant(le, lr)
+
+        c = ConstantConsumption(2.0)
+        p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c), Dict{Equipment, Tuple{Float64, Float64}}(e1 => (120.0, 150.0))) # No e2: no path e1 -> out!
+        p2 = Product("Inox", Dict{Equipment, ConsumptionModel}(e1 => c), Dict{Equipment, Tuple{Float64, Float64}}(e1 => (120.0, 150.0)))
+        ob = OrderBook(Dict(DateTime(2017, 01, 30) => (p1, 50.), DateTime(2017, 01, 31) => (p2, 50.)))
+
+        date = DateTime(2017, 01, 01, 08)
+        t = Timing(timeBeginning=date, timeHorizon=Week(5), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+
+        m = Model(solver=CbcSolver(logLevel=0))
+        @test_throws ErrorException PlantModel(m, p, ob, t, s)
       end
     end
   end

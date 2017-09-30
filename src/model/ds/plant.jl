@@ -18,7 +18,7 @@ struct PlantModel
     # Consistency check: the plant must have the required equipments for all the products in the order book.
     for pr in products(ob) # TODO: To check!
       if ! hasRequiredEquipments(p, pr)
-        error("Required equipment " * name(e) * " not found in plant.")
+        error("Some required equipment for product $(name(pr)) not found in plant.")
       end
     end
 

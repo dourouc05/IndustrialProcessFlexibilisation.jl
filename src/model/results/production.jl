@@ -36,7 +36,7 @@ struct ProductionModelResults
   shiftsOpenRaw::Array{Bool, 1}
   shiftsOpen::Array{Tuple{DateTime, Hour, Int}, 1} # TODO: make a specific data structure with dedicated operations? Would guarantee invariants as checked at the beginning of model/hr.jl:teamModel; other operations of this function would be simplified. Could make this data structure easier to evolve (two full teams are probably not needed if two machines are to be operated, depending on the plant). In this case, this data structure would remove the raw field. 
 
-  productionPlanOutput::Array{Float64, 2}
+  productionPlanOutput::Array{Float64, 2} # TODO: Rewrite using the proposed Batch structure? Could get rid of the fixed matrix structure. 
 
   # Infeasible constructor. 
   function ProductionModelResults(model::Model, plantModel::PlantModel)

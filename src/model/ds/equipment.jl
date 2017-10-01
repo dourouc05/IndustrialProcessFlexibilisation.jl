@@ -172,7 +172,7 @@ stop(eq::EquipmentModel, d::DateTime) = checkDate(eq, d - processTime(eq), :stop
 
 
 # Define the constraints.
-function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel) # TODO: To test.
+function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
   for d in eachTimeStep(eq)
     # TODO: Only for non-continuous processes.
     # An equipment is started if it was off and becomes on. This only makes sense if the process lasts for more than
@@ -301,7 +301,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel) # TODO:
   end
 end
 
-function postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel) # TODO: To test.
+function postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel) 
   for d in eachTimeStep(eq)
     # At most one product at a time.
     # TODO: Should be implied by the equipment constraints.

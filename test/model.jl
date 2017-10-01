@@ -1283,6 +1283,27 @@
         @test(getobjectivevalue(m) == 1.)
       end
     end
+
+    @testset "All pieces of equipment" begin
+      # TODO: model/ds/equipment.jl, postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 1})
+    end
+
+    @testset "Each piece of equipment" begin
+      # TODO: model/ds/equipment.jl, postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
+      # TODO: model/ds/equipment.jl, postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel) 
+    end
+
+    @testset "Order book" begin
+      # TODO: model/ds/orderbook.jl, postConstraints(m::Model, ob::OrderBookModel, out::ImplicitEquipmentModel, alreadyProduced::Dict{Product, Float64}=Dict{Product, Float64}())
+    end
+
+    @testset "Flows" begin
+      # TODO: model/ds/flow.jl, postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, AbstractEquipmentModel}) 
+    end
+
+    @testset "Objectives" begin
+      # TODO: model/ds/objective.jl 
+    end
   end
 
   @testset "Production model" begin

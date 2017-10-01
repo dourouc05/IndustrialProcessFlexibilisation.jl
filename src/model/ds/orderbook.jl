@@ -46,7 +46,7 @@ productId(ob::OrderBookModel, p::Product) = productId(orderBook(ob), p)
 productFromId(ob::OrderBookModel, i::Int) = productFromId(orderBook(ob), i)
 
 
-function postConstraints(m::Model, ob::OrderBookModel, out::ImplicitEquipmentModel, alreadyProduced::Dict{Product, Float64}=Dict{Product, Float64}()) # TODO: To test.
+function postConstraints(m::Model, ob::OrderBookModel, out::ImplicitEquipmentModel, alreadyProduced::Dict{Product, Float64}=Dict{Product, Float64}())
   if kind(out) != :out
     error("Expected the output node as equipment, got: " * string(king(out)))
   end

@@ -7,14 +7,14 @@ function productionModel(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts
   pm = PlantModel(m, p, ob, timing, shifts)
 
   ## Constraints.
-  postConstraints(m, pm.hr, forcedShifts)
-  postConstraints(m, pm.hr, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm)))))
-  for eq in values(equipmentModels(pm))
-    postConstraints(m, eq, pm.hr)
+  postConstraints(m, pm.hr, forcedShifts) # Timing and HR
+  postConstraints(m, pm.hr, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm))))) # All equipments
+  for eq in values(equipmentModels(pm)) 
+    postConstraints(m, eq, pm.hr) # Each equipment
   end
-  postConstraints(m, pm.ob, equipmentModel(pm, "out"), alreadyProduced)
+  postConstraints(m, pm.ob, equipmentModel(pm, "out"), alreadyProduced) # Order book
   for (name, f) in flowModels(pm)
-    postConstraints(m, f, equipmentModels(pm))
+    postConstraints(m, f, equipmentModels(pm)) # Each flow between pieces of equipment
   end
 
   # TODO: Strengthen the formulation: when two pieces of equipment are next to each other in the same route, then the second may only be activated when the first one is done (batch processes).

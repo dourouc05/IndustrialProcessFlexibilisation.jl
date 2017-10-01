@@ -1315,6 +1315,9 @@
       @test ! failed.feasibility 
       @test failed.model == m
       @test failed.plantModel == pm
+      @test isempty(failed.shiftsOpenRaw)
+      @test isempty(failed.shiftsOpen)
+      @test isempty(failed.productionPlanOutput)
 
       # Then, a successful one. (Only two time steps.)
       production = zeros(Float64, 2, 1)
@@ -1402,6 +1405,19 @@
         @test(shiftFixedSchedule(shiftsFiveEight, 12) == shiftFixedSchedule(shiftsFiveEight, 2))
         @test(shiftFixedSchedule(shiftsFiveEight, 13) == shiftFixedSchedule(shiftsFiveEight, 3))
       end
+    end
+
+    @testset "Results data structures" begin
+      # Embryo, just like the data structure itself! 
+      m = Model()
+      
+      hrr = HRModelResults(m)
+      @test ! hrr.feasibility
+      @test hrr.model == m
+      
+      hrr = HRModelResults(m, Array{Bool}(0, 0), 0.0, 0.0, Array{Bool}(0, 0), Array{Bool}(0, 0), Float64[], Float64[], Float64[], 0.0, 0.0)
+      @test hrr.feasibility
+      @test hrr.model == m
     end
   end
 end

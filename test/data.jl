@@ -760,6 +760,45 @@
       @test nShifts(t, s) == 22
       @test nShifts(t, s, Hour(8)) == nShifts(t, s)
     end
+    
+    @testset "Constructors and getters: one shift duration" begin
+      date = DateTime(2017, 01, 01, 12, 32, 42)
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+      
+      s = Shifts(t, date - Hour(4), Hour(2):Hour(2):Hour(8))
+      @test shiftBeginning(s) == date - Hour(4)
+      @test_throws ErrorException shiftDuration(s)
+      @test shiftDurations(s) == collect(Hour(2):Hour(2):Hour(8))
+      @test shiftDurationsStart(s) == Hour(2)
+      @test shiftDurationsStep(s) == Hour(2)
+      @test shiftDurationsStop(s) == Hour(8)
+      @test minimumShiftDurations(s) == Hour(2)
+      @test maximumShiftDurations(s) == Hour(8)
+      @test nShiftDurations(s) == 4
+      @test nTimeStepsPerShift(t, s) == [2, 4, 6, 8]
+      @test nShifts(t, s) == 22 # Maximum length shifts!
+      @test nShifts(t, s, Hour(2)) == 85
+      @test nShifts(t, s, Hour(4)) == 43
+      @test nShifts(t, s, Hour(6)) == 29
+      @test nShifts(t, s, Hour(8)) == 22
+      
+      s = Shifts(t, date - Hour(4), 2:2:8)
+      @test shiftBeginning(s) == date - Hour(4)
+      @test_throws ErrorException shiftDuration(s)
+      @test shiftDurations(s) == collect(Hour(2):Hour(2):Hour(8))
+      @test shiftDurationsStart(s) == Hour(2)
+      @test shiftDurationsStep(s) == Hour(2)
+      @test shiftDurationsStop(s) == Hour(8)
+      @test minimumShiftDurations(s) == Hour(2)
+      @test maximumShiftDurations(s) == Hour(8)
+      @test nShiftDurations(s) == 4
+      @test nTimeStepsPerShift(t, s) == [2, 4, 6, 8]
+      @test nShifts(t, s) == 22 # Maximum length shifts! 
+      @test nShifts(t, s, Hour(2)) == 85
+      @test nShifts(t, s, Hour(4)) == 43
+      @test nShifts(t, s, Hour(6)) == 29
+      @test nShifts(t, s, Hour(8)) == 22
+    end
 
     @testset "Constructor error handling" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
@@ -785,16 +824,51 @@
       @test_throws ErrorException Shifts(t, date, Hour(4):Hour(2):Hour(8))
     end
 
-    @testset "Converting dates to time steps and shifts" begin
+    @testset "Converting dates to time steps and shifts: one shift duration" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
       t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
       s = Shifts(t, date - Hour(4), Hour(8))
+
       @test_throws ErrorException dateToShift(s, date - Hour(4) - Hour(1))
       @test dateToShift(s, date - Hour(4)) == 1
       @test dateToShift(s, date - Hour(4) + Hour(5)) == 1
       @test dateToShift(s, date - Hour(4) + Hour(7)) == 1
       @test dateToShift(s, date - Hour(4) + Hour(8)) == 2
       @test dateToShift(s, date - Hour(4) + Hour(12)) == 2
+      
+      @test_throws ErrorException dateToShift(s, date - Hour(4), Hour(1)) == 1
+      @test dateToShift(s, date - Hour(4), Hour(8)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(5), Hour(8)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(7), Hour(8)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(8), Hour(8)) == 2
+      @test dateToShift(s, date - Hour(4) + Hour(12), Hour(8)) == 2
+    end
+    
+    @testset "Converting dates to time steps and shifts: multiple shift durations" begin
+      date = DateTime(2017, 01, 01, 12, 32, 42)
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+      s = Shifts(t, date - Hour(4), 4:4:8)
+
+      @test_throws ErrorException dateToShift(s, date - Hour(4) - Hour(1))
+      @test dateToShift(s, date - Hour(4)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(5)) == 2
+      @test dateToShift(s, date - Hour(4) + Hour(7)) == 2
+      @test dateToShift(s, date - Hour(4) + Hour(8)) == 3
+      @test dateToShift(s, date - Hour(4) + Hour(12)) == 4
+      
+      @test_throws ErrorException dateToShift(s, date - Hour(4), Hour(1)) == 1
+
+      @test dateToShift(s, date - Hour(4), Hour(4)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(5), Hour(4)) == 2
+      @test dateToShift(s, date - Hour(4) + Hour(7), Hour(4)) == 2
+      @test dateToShift(s, date - Hour(4) + Hour(8), Hour(4)) == 3
+      @test dateToShift(s, date - Hour(4) + Hour(12), Hour(4)) == 4
+      
+      @test dateToShift(s, date - Hour(4), Hour(8)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(5), Hour(8)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(7), Hour(8)) == 1
+      @test dateToShift(s, date - Hour(4) + Hour(8), Hour(8)) == 2
+      @test dateToShift(s, date - Hour(4) + Hour(12), Hour(8)) == 2
     end
 
     @testset "Shifting in time" begin
@@ -803,27 +877,64 @@
       t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
       s = Shifts(t, date - Hour(4), Hour(8))
 
-      @test(shiftBeginning(shift(t, s, Day(0))) == date - Hour(4))
-      @test(shiftDurations(shift(t, s, Day(0))) == shiftDurations(s))
+      @test shiftBeginning(shift(t, s, Day(0))) == date - Hour(4)
+      @test shiftDurations(shift(t, s, Day(0))) == shiftDurations(s)
       
-      @test(shiftBeginning(shift(shift(t, Day(1)), s, Day(1))) == date - Hour(4) + Day(1))
-      @test(shiftDurations(shift(shift(t, Day(1)), s, Day(1))) == shiftDurations(s))
+      @test shiftBeginning(shift(shift(t, Day(1)), s, Day(1))) == date - Hour(4) + Day(1)
+      @test shiftDurations(shift(shift(t, Day(1)), s, Day(1))) == shiftDurations(s)
     end
-
-    @testset "Number of shifts" begin
+    
+    @testset "Number of shifts: one shift duration" begin
       date = DateTime(2017, 01, 01, 12, 32, 42)
       t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
 
       # Focus on number of shifts: when optimisation and shifts start simultaneously, the computation is easy; if shifts start
       # before, there must be one more shift at most.
       s = Shifts(t, date, Hour(8))
-      @test(nShifts(t, s) == 3 * 7)
+      @test nShifts(t, s) == 3 * 7
+      @test nShifts(t, s, Hour(8)) == 3 * 7
+      @test_throws ErrorException nShifts(t, s, Hour(2))
 
       s = Shifts(t, date - Hour(4), Hour(8))
-      @test(nShifts(t, s) == 3 * 7 + 1)
+      @test nShifts(t, s) == 3 * 7 + 1
+      @test nShifts(t, s, Hour(8)) == 3 * 7 + 1
+      @test_throws ErrorException nShifts(t, s, Hour(2))
 
       s = Shifts(t, date - Hour(12), Hour(8))
-      @test(nShifts(t, s) == 3 * 7 + 1)
+      @test nShifts(t, s) == 3 * 7 + 1
+      @test nShifts(t, s, Hour(8)) == 3 * 7 + 1
+      @test_throws ErrorException nShifts(t, s, Hour(2))
+    end
+    
+    @testset "Number of shifts: multiple shift durations" begin
+      date = DateTime(2017, 01, 01, 12, 32, 42)
+      t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+
+      # Focus on number of shifts: when optimisation and shifts start simultaneously, the computation is easy; if shifts start
+      # before, there must be one more shift at most.
+      s = Shifts(t, date, 2:2:8)
+      @test nShifts(t, s) == 3 * 7
+      @test nShifts(t, s, Hour(8)) == 3 * 7
+      @test nShifts(t, s, Hour(6)) == 4 * 7
+      @test nShifts(t, s, Hour(4)) == 6 * 7
+      @test nShifts(t, s, Hour(2)) == 12 * 7
+      @test_throws ErrorException nShifts(t, s, Hour(1))
+
+      s = Shifts(t, date - Hour(4), 2:2:8)
+      @test nShifts(t, s) == 3 * 7 + 1
+      @test nShifts(t, s, Hour(8)) == 3 * 7 + 1
+      @test nShifts(t, s, Hour(6)) == 4 * 7 + 1
+      @test nShifts(t, s, Hour(4)) == 6 * 7 + 1
+      @test nShifts(t, s, Hour(2)) == 12 * 7 + 1
+      @test_throws ErrorException nShifts(t, s, Hour(1))
+
+      s = Shifts(t, date - Hour(12), 2:2:8)
+      @test nShifts(t, s) == 3 * 7 + 1
+      @test nShifts(t, s, Hour(8)) == 3 * 7 + 1
+      @test nShifts(t, s, Hour(6)) == 4 * 7 + 1
+      @test nShifts(t, s, Hour(4)) == 6 * 7 + 1
+      @test nShifts(t, s, Hour(2)) == 12 * 7 + 1
+      @test_throws ErrorException nShifts(t, s, Hour(1))
     end
   end
 end

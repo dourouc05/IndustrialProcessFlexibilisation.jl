@@ -119,6 +119,21 @@ function dateToShift(s::Shifts, d::DateTime)
 end
 
 """
+Computes the number of number of shifts between `d` and the beginning of the shifts within `t`. Shifts last `sl`. 
+"""
+function dateToShift(s::Shifts, d::DateTime, sl::TimePeriod)
+  allowedDurations = shiftDurations(s)
+  # push!(allowedDurations, shiftDurationsStep(s)) # To reenable if start % step != 0 allowed. 
+
+  if sl in allowedDurations
+    delta = Millisecond(d - shiftBeginning(s)).value
+    return 1 + floor(Int, delta / Dates.toms(sl)) 
+  else
+    error("Given duration $(sl) not found in the durations allowed by the Shifts object. Allowed durations are: $(allowedDurations)")
+  end
+end
+
+"""
 Shifts the shifts object by the given period `p`. This means that the beginning will be shifted by `p`.
 
 See the corresponding method for `Timing`. 

@@ -24,9 +24,8 @@ struct Shifts
     if durations.start % durations.step != Hour(0)
       error("The minimum shift duration ($(durations.start)) is not a multiple of the step ($(durations.step)).")
     end
-    if durations.stop % durations.step != Hour(0)
-      error("The maximum shift duration ($(durations.stop)) is not a multiple of the step ($(durations.step)).")
-    end
+    # By construction of (current) Julia ranges: Hour(2):Hour(2):Hour(5) == Hour(2):Hour(2):Hour(4). 
+    # Hence a test on start is enough: stop will always be a multiple of the step further away. 
 
     # It is likely possible to get rid of the following constraint, but it helps a lot (production model and shift agregation). 
     if durations.start != durations.step
@@ -37,20 +36,24 @@ struct Shifts
   end
 end
 
-function Shifts(timing::Timing, beginning::DateTime, durations)
+function __testShiftsArguments(timing::Timing, beginning::DateTime, durations)
   if beginning > timeBeginning(timing)
-    error("The shifts must begin at the latest at the beginning of the optimisation horizon.")
+    error("The shifts must begin at the latest at the beginning of the optimisation horizon. " * 
+          "The two can begin at the same time, though. Currently, the shifts start at $(beginning), " *
+          "which is after the beginning of the optimisation horizon, at $(timeBeginning(timing))")
   end
 
-  return Shifts(beginning, durations)
+  return true
 end
 
+Shifts(timing::Timing, beginning::DateTime, durations::StepRange{Hour, Hour}) = 
+  __testShiftsArguments(timing, beginning, durations) && Shifts(beginning, durations)
 Shifts(timing::Timing, beginning::DateTime, durations::StepRange{Int, Int}) = 
-  Shifts(timing, beginning, Hour(durations.start) : Hour(durations.step) : Hour(durations.stop))
+  __testShiftsArguments(timing, beginning, durations) && Shifts(beginning, Hour(durations.start) : Hour(durations.step) : Hour(durations.stop))
 Shifts(timing::Timing, beginning::DateTime, shiftDuration::Hour) = 
-  Shifts(timing, beginning, shiftDuration : Hour(shiftDuration) : shiftDuration)
+  __testShiftsArguments(timing, beginning, shiftDuration) && Shifts(beginning, shiftDuration : Hour(shiftDuration) : shiftDuration)
 Shifts(timing::Timing, beginning::DateTime, shiftDuration::Int) = 
-  Shifts(timing, beginning, Hour(shiftDuration) : Hour(shiftDuration) : Hour(shiftDuration)) # Start and stop must be multiples of step. 
+  __testShiftsArguments(timing, beginning, shiftDuration) && Shifts(beginning, Hour(shiftDuration) : Hour(shiftDuration) : Hour(shiftDuration)) # Start and stop must be multiples of step. 
 
 shiftBeginning(s::Shifts) = s.beginning
 shiftDurations(s::Shifts) = collect(s.durations)
@@ -92,7 +95,7 @@ end
 
 function nShifts(t::Timing, s::Shifts, sl::TimePeriod)
   allowedDurations = shiftDurations(s)
-  push!(allowedDurations, shiftDurationsStep(s))
+  # push!(allowedDurations, shiftDurationsStep(s)) # To reenable if start % step != 0 allowed. 
 
   if sl in allowedDurations
     return ceil(Int, Dates.toms(timeHorizon(t)) / Dates.toms(sl)) +
@@ -120,4 +123,4 @@ Shifts the shifts object by the given period `p`. This means that the beginning 
 
 See the corresponding method for `Timing`. 
 """
-shift(s::Shifts, p::Period) = Shifts(beginning=shiftBeginning(s) + p, duration=shiftDuration(s))
+shift(t::Timing, s::Shifts, p::Period) = Shifts(t, shiftBeginning(s) + p, shiftDuration(s))

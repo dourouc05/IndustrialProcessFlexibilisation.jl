@@ -45,7 +45,7 @@ nProducts(f::FlowModel) = nProducts(orderBook(f))
 # value(f::FlowModel, d::DateTime) = value(f, dateToTimeStep(f, d), productId(eq, p))
 
 
-function postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, AbstractEquipmentModel}) # TODO: To test.
+function postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, AbstractEquipmentModel}) 
   if typeof(origin(f)) <: ImplicitEquipment && typeof(destination(f)) <: ImplicitEquipment
     error("Assertion failed: flow between two implicit equipments (in and out). ")
   end

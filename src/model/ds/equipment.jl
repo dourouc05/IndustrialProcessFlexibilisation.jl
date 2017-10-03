@@ -315,8 +315,10 @@ function postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 
   # A shift is open only if at least one equipment is used during that shift.
   # Otherwise, if the shifts have negative coefficients in the objective, the solver is free to open shifts, even though
   # no one is working at that time.
-  # Note that EquipmentModel has the reverse constraint: on(eq) <= timeStepOpen.
   for d in eachTimeStep(hrm)
     @constraint(m, timeStepOpen(hrm, d) <= sum([on(eq, d) for eq in eqs]))
+    
+    # EquipmentModel has the reverse constraint: on(eq, d) <= timeStepOpen(d).
+    # postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
   end
 end

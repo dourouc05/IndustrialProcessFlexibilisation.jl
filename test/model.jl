@@ -1285,9 +1285,10 @@
     end
 
     @testset "All pieces of equipment" begin
+      # model/ds/equipment.jl, postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 1})
       date = DateTime(2017, 01, 01, 12, 32, 42)
       t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
-      s = Shifts(date, Hour(8))
+      s = Shifts(t, date, Hour(8))
 
       e1 = Equipment("EAF", :eaf)
       e2 = Equipment("LF", :lf)
@@ -1300,12 +1301,16 @@
       eq1m = EquipmentModel(m, e1, t, ob)
       eq2m = EquipmentModel(m, e2, t, ob)
       inm = EquipmentModel(m, inEquipment, t, ob)
-      oum = EquipmentModel(m, outEquipment, t, ob)
+      outm = EquipmentModel(m, outEquipment, t, ob)
 
       postConstraints(m, hrm)
       postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
 
-      # TODO: Add an objective, constraints, test. 
+      # Force a machine to be on, see that there must be some time steps open. 
+      @constraint(m, timeStepOpen(hrm, date) == 1.)
+      @objective(m, Min, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
+      solve(m)
+      @test getobjectivevalue(m) > 0.0
     end
 
     @testset "Each piece of equipment" begin

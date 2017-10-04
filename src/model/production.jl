@@ -29,7 +29,7 @@ function productionModel(p::Plant, ob::OrderBook, timing::Timing, shifts::Shifts
     productionRaw = getvalue(quantity(equipmentModel(pm, "out"))) # TODO: In PlantModel, link to the variables of each subobject model? Define quantity() and others on the plant model? Or just a subset?
     return ProductionModelResults(m, pm, shiftsOpen, shiftsAgregation(shiftsOpen, timing, shifts, solver), productionRaw)
   else
-    if length(outfile) > 0
+    if length(outfile) > 0 # TODO: More configurable than this! Currently, output just if file specified and the problem is infeasible. Should allow outputting in any case, in case of infeasibility, and never. 
       writeLP(m, outfile, genericnames=false)
     end
     return ProductionModelResults(m, pm)

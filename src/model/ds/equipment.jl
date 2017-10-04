@@ -134,7 +134,7 @@ flowOut(eq::EquipmentModel) = eq.flowOut
 on(eq::EquipmentModel) = eq.on
 start(eq::EquipmentModel) = eq.start
 currentProduct(eq::EquipmentModel) = eq.currentProduct
-currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the downstream piece of equipment.")
+currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the up/downstream piece of equipment.")
 
 # Specific model accessors: high level.
 quantity(eq::EquipmentModel, ts::Int, nProduct::Int) = quantity(eq)[ts, nProduct]
@@ -196,7 +196,8 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       end
     end
 
-    # TODO: Linking to the HR part of the model. Maybe also constraints on quantity and so on? Or move to another function (only for coupling EquipmentModel and TimingModel)?
+    # The process may only be running or starting when the current time step is allowed. 
+    # TODO: How to split this among the various components? 
     if nTimeSteps(eq, processTime(eq)) > 1
       @constraint(m, start(eq, d) <= timeStepOpen(hrm, d))
     end
@@ -311,13 +312,13 @@ function postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel)
   end
 end
 
-function postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 1})
+function postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 1}) # TODO: First eqs, then hrm? 
   # A shift is open only if at least one equipment is used during that shift.
   # Otherwise, if the shifts have negative coefficients in the objective, the solver is free to open shifts, even though
   # no one is working at that time.
   for d in eachTimeStep(hrm)
     @constraint(m, timeStepOpen(hrm, d) <= sum([on(eq, d) for eq in eqs]))
-    
+
     # EquipmentModel has the reverse constraint: on(eq, d) <= timeStepOpen(d).
     # postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
   end

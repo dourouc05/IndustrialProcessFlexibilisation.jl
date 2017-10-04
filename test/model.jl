@@ -1313,8 +1313,94 @@
       @test getobjectivevalue(m) > 0.0
     end
 
+    
     @testset "Each piece of equipment" begin
-      # TODO: model/ds/equipment.jl, postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
+      # model/ds/equipment.jl, postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
+      @testset "One process, one time step" begin
+        # TODO: 
+      end
+    
+      @testset "Two processes, one time step" begin
+        date = DateTime(2017, 01, 01, 12, 32, 42)
+        t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        s = Shifts(t, date, Hour(8))
+
+        e1 = Equipment("EAF", :eaf)
+        e2 = Equipment("LF", :lf)
+        c = ConstantConsumption(2.0)
+        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c), Dict{Equipment, Tuple{Float64, Float64}}(e1 => (150.0, 155.0), e2 => (150.0, 155.0)))
+        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+
+        getModel() = begin
+          m = Model(solver=CbcSolver(logLevel=0))
+          hrm = TimingModel(m, t, s)
+          eq1m = EquipmentModel(m, e1, t, ob)
+          eq2m = EquipmentModel(m, e2, t, ob)
+          inm = EquipmentModel(m, inEquipment, t, ob)
+          outm = EquipmentModel(m, outEquipment, t, ob)
+  
+          postConstraints(m, hrm)
+          postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+          postConstraints(m, eq1m, hrm)
+          postConstraints(m, eq2m, hrm)
+
+          return m, hrm, eq1m, eq2m, outm
+        end
+
+        @testset "Link between pieces of equipment and timing" begin
+          @testset "If all time steps are disabled, then no machine may run, at any time" begin
+            m, hrm, eq1m, eq2m, outm = getModel()
+            @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
+            @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
+            solve(m)
+            @test getobjectivevalue(m) == 0.
+          end
+
+          @testset "If one time step is allowed, then the machines may run at that time step" begin
+            m, hrm, eq1m, eq2m, outm = getModel()
+            @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 8.)
+            @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
+            solve(m)
+
+            # Each machine is on for one time step. However, the model only works by shifts, hence allow one shift (8 hours, 8 time steps per machine).
+            @test getobjectivevalue(m) == 2 * 8. 
+            # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
+            # and 1*0 or 1*1 for the two allowed ones). 
+            @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 16. 
+          end
+
+          # @testset "In and out flows" begin
+          #   m, hrm, eq1m, eq2m, outm = getModel()
+          #   # @constraint(m, timeStepOpen(hrm, date) == 1.)
+          #   # @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+          #   # @objective(m, Max, sum(flowIn(outm, d, p) for d in eachTimeStep(hrm)))
+          #   solve(m)
+
+          #   # At the beginning of the horizon, may have no output (just initial conditions). 
+          #   @test getvalue(flowOut(eq1m, date, p)) == .0
+
+          #   # Flows between processes are not affected by any transformation rate. 
+          #   @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          #   @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          #   @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          # end
+
+          @testset "In and out flows with transformation rate" begin
+            # TODO: 
+          end
+        end
+      end
+      
+      @testset "One process, two time steps" begin
+        # TODO: 
+      end
+      
+      @testset "Two processes, two time steps" begin
+        # TODO: 
+      end
+    end
+    
+    @testset "Each piece of implicit equipment" begin
       # TODO: model/ds/equipment.jl, postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel) 
     end
 

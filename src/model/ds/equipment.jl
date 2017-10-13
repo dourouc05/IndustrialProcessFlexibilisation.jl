@@ -190,14 +190,14 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
 
     # TODO: Only for non-continuous processes when they have a duration.
     # When starting, an equipment must remain on for a given number of time periods.
-    if nTimeSteps(eq, processTime(eq)) > 1 # TODO: This condition will disappear when the switch to entity-component is done. (Should be made into a warning.)
+    if nTimeSteps(eq, processTime(eq)) > 1 
       for d2 in eachTimeStep(eq, from=d, to=d + minimumUpTime(eq))
         @constraint(m, on(eq, d2) >= start(eq, d))
       end
     end
 
     # The process may only be running or starting when the current time step is allowed. 
-    # TODO: How to split this among the various components? 
+    # TODO: How to split this among the various components? Just for processes that are not continuous or at least stoppable. 
     if nTimeSteps(eq, processTime(eq)) > 1
       @constraint(m, start(eq, d) <= timeStepOpen(hrm, d))
     end
@@ -209,28 +209,29 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
 
     # Quantities only evolve when the flows in and out are evolving.
     # TODO: Only constraint that is really specific to a piece of equipment.
-    if nTimeSteps(eq, processTime(eq)) == 1
-      # No quantity for such short processes, it is entirely replaced by flowIn.
-      for p in products(eq)
-        if d > timeBeginning(eq)
-          @constraint(m, flowIn(eq, d - timeStepDuration(eq), p) == transformationRate(eq) * flowOut(eq, d, p))
-        elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! For now, was empty.
-          @constraint(m, flowOut(eq, d, p) == 0.)
-        end
-      end
-    else
+    if nTimeSteps(eq, processTime(eq)) > 1
       for p in products(eq)
         if d > timeBeginning(eq)
           @constraint(m, quantity(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) + flowIn(eq, d, p) - transformationRate(eq) * flowOut(eq, d, p))
         elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! For now, was empty.
           @constraint(m, quantity(eq, d, p) == flowIn(eq, d, p))
+          # No outflow ensured by the minimum and maximum flows for the process (when d is before the  process time). 
+        end
+      end
+    else
+      # No quantity for short processes (one time step), it is entirely replaced by flowIn.
+      for p in products(eq)
+        if d > timeBeginning(eq)
+          @constraint(m, flowIn(eq, d - timeStepDuration(eq), p) == transformationRate(eq) * flowOut(eq, d, p))
+        elseif d == timeBeginning(eq) 
+          # No outflow ensured by the minimum and maximum flows for the process (when d is before the  process time). 
         end
       end
     end
 
     # At most one product at a time, but only when the equipment is on.
-    # Only when there are multiple products!
-    if nProducts(eq) > 1 # TODO: To test specifically!
+    # Obviously, only when there are multiple products!
+    if nProducts(eq) > 1 
       maxFlowIn = min(maximumProduction(eq), minimum([maxBatchSize(p, eq) for p in products(eq)]))
       minFlowIn = max(minimumProduction(eq), maximum([minBatchSize(p, eq) for p in products(eq)]))
 
@@ -252,8 +253,9 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     minFlowIn = max(minimumProduction(eq), maximum([minBatchSize(p, eq) for p in products(eq)]))
     @constraint(m, sum([flowIn(eq, d, p) for p in products(eq)]) <= maxFlowIn * start(eq, d))
 
+    # TODO: Factor this out for stoppable processes!
     # Limit the quantity within the process when it is off, either globally or per product.
-    if nProducts(eq) > 1 # TODO: To test specifically!
+    if nProducts(eq) > 1
       # A batch equipement can only have contents when it is on.
       if minimumProduction(eq) != maxFlowIn
         @constraint(m, sum([quantity(eq, d, p) for p in products(eq)]) <= maxFlowIn * on(eq, d))
@@ -288,8 +290,10 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       end
     end
 
+    # TODO: Factor this out for batch processes!
     # A batch equipment can only have outputs when it is done.
     if d - processTime(eq) < timeBeginning(eq)
+      # TODO: Initial conditions to replace the zero. 
       @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == 0.)
     else
       if maxFlowIn != minFlowIn

@@ -4,15 +4,13 @@ struct FlowModel
   timing::Timing
   ob::OrderBook
 
-  value::Array{JuMP.Variable,1}
   minValue::Float64
   maxValue::Float64
 
   function FlowModel(m::Model, origin::AbstractEquipment, destination::AbstractEquipment, timing::Timing, orderBook::OrderBook; minValue::Float64=0.0, maxValue::Float64=1.e10)
-    # @variable(m, minValue <= value[t=1:nTimeSteps(timing)] <= maxValue)#, basename="flow_value_" * name(origin) * "_to_" * name(destination) * "_$t")
-    value = JuMP.Variable[] # TODO: Is a variable needed here? Yes, when there are multiple routes. I guess this class is flawed by design: should rather be a point between equipments.
+    # value = JuMP.Variable[] # TODO: Is a variable needed here? Yes, when there are multiple routes. I guess this class is flawed by design: should rather be a point between equipments (some dummy kind of equipment).
 
-    return new(origin, destination, timing, orderBook, value, minValue, maxValue)
+    return new(origin, destination, timing, orderBook, minValue, maxValue)
   end
 end
 
@@ -39,11 +37,6 @@ eachTimeStep(f::FlowModel; kwargs...) = eachTimeStep(timing(f); kwargs...)
 products(f::FlowModel) = products(orderBook(f))
 nProducts(f::FlowModel) = nProducts(orderBook(f))
 
-# Specific model accessors (need the sub-objects accessors).
-# value(f::FlowModel) = f.value
-# value(f::FlowModel, ts::Int) = value(f)[ts]
-# value(f::FlowModel, d::DateTime) = value(f, dateToTimeStep(f, d), productId(eq, p))
-
 
 function postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, AbstractEquipmentModel}) 
   if typeof(origin(f)) <: ImplicitEquipment && typeof(destination(f)) <: ImplicitEquipment
@@ -53,7 +46,7 @@ function postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, Abstr
   for d in eachTimeStep(f)
     for p in products(f)
       @constraint(m, flowOut(eqs[name(origin(f))], d, p) == flowIn(eqs[name(destination(f))], d, p))
-      @constraint(m, flowOut(eqs[name(origin(f))], d, p) <= maximumValue(f)) # As there is no flow variable, the bounds must be imposed somewhere.
+      @constraint(m, flowOut(eqs[name(origin(f))], d, p) <= maximumValue(f)) # As there is no variable for a flow, the bounds must be imposed somewhere.
       if minimumValue(f) > 0
         @constraint(m, flowOut(eqs[name(origin(f))], d, p) >= minimumValue(f))
       end

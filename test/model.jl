@@ -1214,6 +1214,7 @@
 
   @testset "Model building blocks (postConstraints)" begin
     @testset "Timing" begin
+      # model/ds/timing.jl, postConstraints(m::Model, hr::TimingModel, forcedShifts::Array{Tuple{DateTime, Hour, Int}, 1}=Tuple{DateTime, Hour, Int}[])
       @testset "Shifts and optimisation starts simultaneously" begin
         date = DateTime(2017, 01, 01, 08)
         t = Timing(timeBeginning=date, timeHorizon=Day(2), timeStepDuration=Hour(1))
@@ -1312,44 +1313,47 @@
       solve(m)
       @test getobjectivevalue(m) > 0.0
     end
-
     
     @testset "Each piece of equipment" begin
       # model/ds/equipment.jl, postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
-      @testset "One process, one time step" begin
+      @testset "One process, one time step, one product" begin
         # TODO: 
       end
     
-      @testset "Two processes, one time step" begin
+      @testset "Two processes, one time step, one product" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
         t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
         s = Shifts(t, date, Hour(8))
 
-        e1 = Equipment("EAF", :eaf)
-        e2 = Equipment("LF", :lf)
-        c = ConstantConsumption(2.0)
-        p = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c), Dict{Equipment, Tuple{Float64, Float64}}(e1 => (150.0, 155.0), e2 => (150.0, 155.0)))
-        ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
+        getModel(trfEAF=1., trfLF=1.) = begin
+          e1 = Equipment("EAF", :eaf, trfEAF)
+          e2 = Equipment("LF", :lf, trfLF)
+          c = ConstantConsumption(2.0)
+          p = Product("Steel", Dict{Equipment, ConsumptionModel}(e1 => c, e2 => c), Dict{Equipment, Tuple{Float64, Float64}}(e1 => (150.0, 155.0), e2 => (150.0, 155.0)))
+          ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
-        getModel() = begin
           m = Model(solver=CbcSolver(logLevel=0))
           hrm = TimingModel(m, t, s)
           eq1m = EquipmentModel(m, e1, t, ob)
           eq2m = EquipmentModel(m, e2, t, ob)
           inm = EquipmentModel(m, inEquipment, t, ob)
           outm = EquipmentModel(m, outEquipment, t, ob)
+          eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
   
           postConstraints(m, hrm)
           postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
           postConstraints(m, eq1m, hrm)
           postConstraints(m, eq2m, hrm)
+          postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=155.), eqms)
+          postConstraints(m, FlowModel(m, e1, e2, t, ob, maxValue=155.), eqms)
+          postConstraints(m, FlowModel(m, e2, outEquipment, t, ob, maxValue=155.), eqms)
 
-          return m, hrm, eq1m, eq2m, outm
+          return e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm
         end
 
         @testset "Link between pieces of equipment and timing" begin
           @testset "If all time steps are disabled, then no machine may run, at any time" begin
-            m, hrm, eq1m, eq2m, outm = getModel()
+            e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
             @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
             @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
             solve(m)
@@ -1357,45 +1361,58 @@
           end
 
           @testset "If one time step is allowed, then the machines may run at that time step" begin
-            m, hrm, eq1m, eq2m, outm = getModel()
+            e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
             @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 8.)
             @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
             solve(m)
 
             # Each machine is on for one time step. However, the model only works by shifts, hence allow one shift (8 hours, 8 time steps per machine).
-            @test getobjectivevalue(m) == 2 * 8. 
+            # Due to the processing times, cannot reach 2*8. 
+            @test getobjectivevalue(m) == 2 * 8. - 1
             # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
             # and 1*0 or 1*1 for the two allowed ones). 
-            @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 16. 
+            @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 
           end
 
-          # @testset "In and out flows" begin
-          #   m, hrm, eq1m, eq2m, outm = getModel()
-          #   # @constraint(m, timeStepOpen(hrm, date) == 1.)
-          #   # @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
-          #   # @objective(m, Max, sum(flowIn(outm, d, p) for d in eachTimeStep(hrm)))
-          #   solve(m)
+          @testset "In and out flows" begin
+            e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
+            @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
+            @constraint(m, timeStepOpen(hrm, date) == 1.)
+            @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+            @objective(m, Max, sum(flowIn(outm, d, p) for d in eachTimeStep(hrm)))
+            solve(m)
 
-          #   # At the beginning of the horizon, may have no output (just initial conditions). 
-          #   @test getvalue(flowOut(eq1m, date, p)) == .0
+            # At the beginning of the horizon, may have no output (just initial conditions). 
+            @test getvalue(flowOut(eq1m, date, p)) == .0
 
-          #   # Flows between processes are not affected by any transformation rate. 
-          #   @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-          #   @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-          #   @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
-          # end
+            # Flows between processes are not affected by any transformation rate. 
+            @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+
+            # Effect on the overall values. 
+            @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == 15 * 155.
+            @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 15 * 155. atol=1.e-5
+          end
 
           @testset "In and out flows with transformation rate" begin
-            # TODO: 
+            @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
+            @constraint(m, timeStepOpen(hrm, date) == 1.)
+            @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+            @objective(m, Max, sum(flowIn(outm, d, p) for d in eachTimeStep(hrm)))
+            solve(m)
+
+            # At the beginning of the horizon, may have no output (just initial conditions). 
           end
         end
       end
       
-      @testset "One process, two time steps" begin
+      @testset "One process, two time steps, one product" begin
         # TODO: 
       end
       
-      @testset "Two processes, two time steps" begin
+      @testset "Two processes, two time steps, one product" begin
+        # TODO: 
         # TODO: 
       end
     end

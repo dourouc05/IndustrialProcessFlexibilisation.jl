@@ -212,7 +212,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     if nTimeSteps(eq, processTime(eq)) > 1
       for p in products(eq)
         if d > timeBeginning(eq)
-          @constraint(m, quantity(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) + flowIn(eq, d, p) - transformationRate(eq) * flowOut(eq, d, p))
+          @constraint(m, quantity(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) + flowIn(eq, d, p) - flowOut(eq, d, p) / transformationRate(eq))
         elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! For now, was empty.
           @constraint(m, quantity(eq, d, p) == flowIn(eq, d, p))
           # No outflow ensured by the minimum and maximum flows for the process (when d is before the  process time). 
@@ -222,7 +222,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       # No quantity for short processes (one time step), it is entirely replaced by flowIn.
       for p in products(eq)
         if d > timeBeginning(eq)
-          @constraint(m, flowIn(eq, d - timeStepDuration(eq), p) == transformationRate(eq) * flowOut(eq, d, p))
+          @constraint(m, flowIn(eq, d - timeStepDuration(eq), p) == flowOut(eq, d, p) / transformationRate(eq))
         elseif d == timeBeginning(eq) 
           # No outflow ensured by the minimum and maximum flows for the process (when d is before the  process time). 
         end

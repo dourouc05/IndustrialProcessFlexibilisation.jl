@@ -23,14 +23,14 @@ minimumValue(f::FlowModel) = f.minValue # TODO: To test!
 maximumValue(f::FlowModel) = f.maxValue # TODO: To test!
 
 # Link to the methods of Timing.
-timeBeginning(f::FlowModel) = timeBeginning(timing(f))
-timeHorizon(f::FlowModel) = timeHorizon(timing(f))
+timeBeginning(f::FlowModel) = timeBeginning(timing(f)) # TODO: To test
+timeHorizon(f::FlowModel) = timeHorizon(timing(f)) # TODO: To test
 timeEnding(f::FlowModel) = timeEnding(timing(f)) # TODO: To test
-timeStepDuration(f::FlowModel) = timeStepDuration(timing(f))
+timeStepDuration(f::FlowModel) = timeStepDuration(timing(f)) # TODO: To test
 
-nTimeSteps(f::FlowModel, d::Period) = nTimeSteps(timing(f), d) # TODO: Required here or not?
-nTimeSteps(f::FlowModel) = nTimeSteps(timing(f))
-dateToTimeStep(f::FlowModel, d::DateTime) = dateToTimeStep(timing(f), d)
+nTimeSteps(f::FlowModel, d::Period) = nTimeSteps(timing(f), d)  # TODO: To test
+nTimeSteps(f::FlowModel) = nTimeSteps(timing(f)) # TODO: To test
+dateToTimeStep(f::FlowModel, d::DateTime) = dateToTimeStep(timing(f), d) # TODO: To test
 eachTimeStep(f::FlowModel; kwargs...) = eachTimeStep(timing(f); kwargs...)
 
 # Link to the methods of OrderBook.

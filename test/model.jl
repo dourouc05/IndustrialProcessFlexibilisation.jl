@@ -1374,7 +1374,7 @@
             @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 
           end
 
-          @testset "In and out flows" begin
+          @testset "In and out flows without transformation rate" begin
             e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
             @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
             @constraint(m, timeStepOpen(hrm, date) == 1.)
@@ -1396,13 +1396,29 @@
           end
 
           @testset "In and out flows with transformation rate" begin
+            e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel(.99, .99)
             @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
             @constraint(m, timeStepOpen(hrm, date) == 1.)
             @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
-            @objective(m, Max, sum(flowIn(outm, d, p) for d in eachTimeStep(hrm)))
+            @objective(m, Max, sum(flowOut(inm, d, p) for d in eachTimeStep(hrm)))
             solve(m)
 
             # At the beginning of the horizon, may have no output (just initial conditions). 
+            @test getvalue(flowOut(eq1m, date, p)) == .0
+
+            # Flows between processes are not affected by any transformation rate, even though there is one applied. 
+            @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+
+            # Flows at the borders of a process are affected by the transformation rate. 
+            # Time shift between the input and the output for the same process! 
+            @test .99 * getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
+            @test .99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
+            
+            # Effect on the overall values, with the transformation rates at the output. 
+            @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ 15 * 155. * (.99 ^ 2) atol=1.e-4 
+            @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 15 * 155. atol=1.e-4
           end
         end
       end
@@ -1413,6 +1429,20 @@
       
       @testset "Two processes, two time steps, one product" begin
         # TODO: 
+      end
+      @testset "One process, one time step, two products" begin
+        # TODO: 
+      end
+    
+      @testset "Two processes, one time step, two products" begin
+      # TODO: 
+      end
+      
+      @testset "One process, two time steps, two products" begin
+      # TODO: 
+      end
+      
+      @testset "Two processes, two time steps, two products" begin
         # TODO: 
       end
     end

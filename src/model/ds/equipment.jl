@@ -236,7 +236,8 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       minFlowIn = max(minimumProduction(eq), maximum([minBatchSize(p, eq) for p in products(eq)]))
 
       # @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= 1) # TODO: Why does this help the solver?
-      @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) == on(eq, d)) # Slightly stronger than writing currentProduct <= on for each product separately.
+      @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= on(eq, d)) # Slightly stronger than writing currentProduct <= on for each product separately.
+
       for p in products(eq)
         if min(maxFlowIn, maxBatchSize(p, eq)) != max(minFlowIn, minBatchSize(p, eq))
           @constraint(m, quantity(eq, d, p) <= min(maxFlowIn, maxBatchSize(p, eq)) * currentProduct(eq, d, p))
@@ -269,12 +270,12 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       # The contents of the equipment are limited by the heat size.
       for p in products(eq)
         if min(maximumProduction(eq), maxBatchSize(p, eq)) != minBatchSize(p, eq)
-          @constraint(m, quantity(eq, d, p) <= min(maximumProduction(eq), maxBatchSize(p, eq)) * on(eq, d))
+          @constraint(m, quantity(eq, d, p) <= min(maximumProduction(eq), maxBatchSize(p, eq)) * currentProduct(eq, d, p))
           if minBatchSize(p, eq) > 0.
-            @constraint(m, quantity(eq, d, p) >= minBatchSize(p, eq) * on(eq, d))
+            @constraint(m, quantity(eq, d, p) >= minBatchSize(p, eq) * currentProduct(eq, d, p))
           end
         else
-          @constraint(m, quantity(eq, d, p) == minBatchSize(p, eq) * on(eq, d))
+          @constraint(m, quantity(eq, d, p) == minBatchSize(p, eq) * currentProduct(eq, d, p))
         end
       end
     else

@@ -40,6 +40,8 @@ daysOfWeekFor(t::Timing, duration::Period) = daysOfWeekUntil(t, timeBeginning(t)
 """
 Loops over the time steps, from `from` (by default, the start of the optimisation) to `to` (by default, the end of
 optimisation), not inclusive for `to`. Alternatively, instead of `to`, a `duration` can be given (also not inclusive).
+
+See also `eachShift`. 
 """
 function eachTimeStep(t::Timing; from::DateTime=timeBeginning(t), kwargs...)
   if length(kwargs) == 0

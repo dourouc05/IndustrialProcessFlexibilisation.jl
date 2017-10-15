@@ -10,6 +10,7 @@ struct FlowModel
   function FlowModel(m::Model, origin::AbstractEquipment, destination::AbstractEquipment, timing::Timing, orderBook::OrderBook; minValue::Float64=0.0, maxValue::Float64=1.e10)
     # value = JuMP.Variable[] # TODO: Is a variable needed here? Yes, when there are multiple routes. I guess this class is flawed by design: should rather be a point between equipments (some dummy kind of equipment).
 
+    # TODO: minValue and maxValue should be computed within this constructor rather than outside. 
     return new(origin, destination, timing, orderBook, minValue, maxValue)
   end
 end

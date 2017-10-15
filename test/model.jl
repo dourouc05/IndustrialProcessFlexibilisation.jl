@@ -1322,9 +1322,10 @@
         s = Shifts(t, date, Hour(8))
 
         getModel(trf=1.) = begin
-          e = Equipment("EAF", :eaf, trf)
+          e = Equipment("EAF", :eaf, trf, Hour(1), 0.0, 1.e6, Hour(2))
+          #                                                   ^^^^^^^
           c = ConstantConsumption(2.0)
-          p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 155.0)))
+          p = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (150.0, 150.0)))
           ob = OrderBook(Dict{DateTime, Tuple{Product, Float64}}(date + Day(2) => (p, 50)))
 
           m = Model(solver=CbcSolver(logLevel=0))
@@ -1337,8 +1338,8 @@
           postConstraints(m, hrm)
           postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eqm, inm, outm]))) # Same filtering as in model/production.jl. 
           postConstraints(m, eqm, hrm)
-          postConstraints(m, FlowModel(m, inEquipment, e, t, ob, maxValue=155.), eqms)
-          postConstraints(m, FlowModel(m, e, outEquipment, t, ob, maxValue=155.), eqms)
+          postConstraints(m, FlowModel(m, inEquipment, e, t, ob, maxValue=150.), eqms)
+          postConstraints(m, FlowModel(m, e, outEquipment, t, ob, maxValue=150.), eqms)
 
           return e, c, p, ob, m, hrm, eqm, inm, outm
         end
@@ -1378,12 +1379,12 @@
             @test getvalue(flowOut(eqm, date, p)) == 0.
 
             # Flows between processes are not affected by any transformation rate. 
-            @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
-            @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
             # Effect on the overall values. 
-            @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == 16 * 155.
-            @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 155. atol=1.e-5
+            @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == 16 * 150. / 2
+            @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 150. / 2 atol=1.e-5
           end
           
           @testset "In and out flows with transformation rate" begin
@@ -1403,11 +1404,11 @@
 
             # Flows at the borders of a process are affected by the transformation rate. 
             # Time shift between the input and the output for the same process! 
-            @test .99 * getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
+            @test .99 * getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])[1:end-2] ≈ getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)])[3:end] atol=1.e-4
             
             # Effect on the overall values, with the transformation rates at the output. 
-            @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 155. * .99 atol=1.e-4 
-            @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 155. atol=1.e-4
+            @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 150. / 2 * .99 atol=1.e-4 
+            @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 150. / 2 atol=1.e-4
           end
         end
       end
@@ -1573,7 +1574,21 @@
             solve(m)
 
             @test getobjectivevalue(m) == 8.
-            @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 8. 
+            @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 8. 
+          end
+
+          @testset "Exact process duration respected" begin
+            e, c, p, ob, m, hrm, eqm, inm, outm = getModel()
+            @constraint(m, start(eqm, date) == 1.)
+            @objective(m, Min, sum(on(eqm, d) for d in eachTimeStep(hrm)))
+            solve(m)
+
+            @test getvalue(start(eqm, date + Hour(1))) == 0. # Cannot yet start, not yet finished. 
+            @test getvalue(on(eqm, date)) == 1. # Must be on, as started this time step. 
+            @test getvalue(on(eqm, date + Hour(1))) == 1. # Must be on, as started one time step ago (the process lasts two time steps). 
+            @test getvalue(on(eqm, date + Hour(2))) == 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
+            # and minimising the number of time steps where the process is on. 
+            @test getvalue(on(eqm, date + Hour(3))) == 0.
           end
         end
         

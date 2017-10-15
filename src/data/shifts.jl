@@ -106,6 +106,44 @@ function nShifts(t::Timing, s::Shifts, sl::TimePeriod)
 end
 
 """
+Loops over the shifts, from `from` (by default, the start of the shifts) to `to` (by default, the end of the
+optimisation horizon), not inclusive for `to`. Alternatively, instead of `to`, a `duration` can be given (also not inclusive).
+
+When there is only one possible shift length, then it is used as shift duration in this function. However, when
+there are multiple shift lengths allowed, it iterates over the minimum-length shifts. 
+
+See also `eachTimeStep`. 
+"""
+function eachShift(t::Timing, s::Shifts; from::DateTime=shiftBeginning(s), kwargs...) # TODO: To test!
+  # Follows the same structure as eachTimeStep (Timing). 
+
+  if length(kwargs) == 0
+    # Most usual case: loop over all time steps, from the given start to the end of optimisation.
+    return from : shiftDurationsStep(s) : timeBeginning(t) + timeHorizon(t) - timeStepDuration(t)
+  elseif length(kwargs) != 1
+    error("Should give either to or duration as argument (not both, not none).")
+  end
+
+  if ! isa(kwargs[1][2], DateTime) && ! isa(kwargs[1][2], Period)
+    error("Unexpected type for " * string(kwargs[1][1]) * "; this function only accepts DateTime and Period as keyword arguments")
+  end
+
+  if kwargs[1][1] == :to && ! isa(kwargs[1][2], DateTime)
+    error("If giving a to keyword argument, it must be a DateTime; did you mean to use duration?")
+  elseif kwargs[1][1] == :duration && ! isa(kwargs[1][2], Period)
+    error("If giving a duration keyword argument, it must be a Period; did you mean to use to?")
+  end
+
+  if kwargs[1][1] == :to
+    return from : shiftDurationsStep(s) : kwargs[1][2] - timeStepDuration(t)
+  elseif kwargs[1][1] == :duration
+    return from : shiftDurationsStep(s) : from + kwargs[1][2] - timeStepDuration(t)
+  else
+    error("Unexpected keyword argument: " * string(kwargs[1][1]))
+  end
+end
+
+"""
 Computes the number of minimum-length shifts between `d` and the beginning of the shifts within `t`. If this number is not integer,
 the closest integer is returned.
 """

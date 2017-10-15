@@ -35,6 +35,7 @@ nTimeSteps(hr::TimingModel) = nTimeSteps(timing(hr))
 nTimeStepsPerShift(hr::TimingModel) = nTimeStepsPerShift(timing(hr), shifts(hr))
 dateToTimeStep(hr::TimingModel, d::DateTime) = dateToTimeStep(timing(hr), d)
 eachTimeStep(hr::TimingModel; kwargs...) = eachTimeStep(timing(hr); kwargs...)
+eachShift(hr::TimingModel; kwargs...) = eachShift(timing(hr), shifts(hr); kwargs...) # TODO: To test!
 
 # Link to the methods of Shifts. 
 shiftBeginning(hr::TimingModel) = shiftBeginning(shifts(hr))

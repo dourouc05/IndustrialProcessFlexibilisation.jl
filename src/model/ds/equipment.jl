@@ -113,10 +113,11 @@ timeHorizon(eq::AbstractEquipmentModel) = timeHorizon(timing(eq))
 timeEnding(eq::AbstractEquipmentModel) = timeEnding(timing(eq))
 timeStepDuration(eq::AbstractEquipmentModel) = timeStepDuration(timing(eq))
 
-nTimeSteps(eq::AbstractEquipmentModel, d::Period) = nTimeSteps(timing(eq), d) # TODO: Required here or not?
+nTimeSteps(eq::AbstractEquipmentModel, d::Period) = nTimeSteps(timing(eq), d)
 nTimeSteps(eq::AbstractEquipmentModel) = nTimeSteps(timing(eq))
 dateToTimeStep(eq::AbstractEquipmentModel, d::DateTime) = dateToTimeStep(timing(eq), d)
 eachTimeStep(eq::AbstractEquipmentModel; kwargs...) = eachTimeStep(timing(eq); kwargs...)
+eachShift(eq::AbstractEquipmentModel; kwargs...) = eachShift(timing(eq); kwargs...) # TODO: To test! 
 
 # Link to the methods of OrderBook.
 products(eq::AbstractEquipmentModel) = products(orderBook(eq))
@@ -181,7 +182,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       # The process lasts for multiple time steps.
       if d > timeBeginning(eq)
         @constraint(m, start(eq, d) <= on(eq, d))
-        @constraint(m, start(eq, d) <= off(eq, d - timeStepDuration(eq)))
+        # @constraint(m, start(eq, d) <= off(eq, d - timeStepDuration(eq)))
         @constraint(m, start(eq, d) >= on(eq, d) + off(eq, d - timeStepDuration(eq)) - 1)
       elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! For now, was off.
         @constraint(m, on(eq, d) == start(eq, d))
@@ -215,7 +216,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
           @constraint(m, quantity(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) + flowIn(eq, d, p) - flowOut(eq, d, p) / transformationRate(eq))
         elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! For now, was empty.
           @constraint(m, quantity(eq, d, p) == flowIn(eq, d, p))
-          # No outflow ensured by the minimum and maximum flows for the process (when d is before the  process time). 
+          # No outflow ensured by the minimum and maximum flows for the process (when d is before the processing time). 
         end
       end
     else
@@ -321,7 +322,7 @@ function postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 
   # A shift is open only if at least one equipment is used during that shift.
   # Otherwise, if the shifts have negative coefficients in the objective, the solver is free to open shifts, even though
   # no one is working at that time.
-  for d in eachTimeStep(hrm)
+  for d in eachShift(hrm)
     @constraint(m, timeStepOpen(hrm, d) <= sum([on(eq, d) for eq in eqs]))
 
     # EquipmentModel has the reverse constraint: on(eq, d) <= timeStepOpen(d).

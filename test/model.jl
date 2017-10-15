@@ -2012,7 +2012,7 @@
       @test pr.shiftsOpen[1][3] == 1
       @test size(pr.productionPlanOutput, 1) == 840
       @test size(pr.productionPlanOutput, 2) == 1
-      @test sum(pr.productionPlanOutput) == 360
+      @test sum(pr.productionPlanOutput) == 120
     end
   end
 

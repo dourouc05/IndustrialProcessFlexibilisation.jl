@@ -952,9 +952,9 @@
         @test all((electricityPrice(dobj) .== ep_ts).values)
         @test electricityPrice(dobj, date) == ep[1]
         @test electricityPrice(dobj, date + Hour(1)) == ep[2]
-        @test_broken electricityPrice(dobj, date - Hour(1)) # TODO: Should fail with an error: outside date range.
-        @test_broken electricityPrice(dobj, date + Week(1) + Hour(1)) # TODO: Should fail with an error: outside date range.
-
+        @test_throws ErrorException electricityPrice(dobj, date - Hour(1)) 
+        @test_throws ErrorException electricityPrice(dobj, date + Week(1) + Hour(1)) 
+        
         eq = collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm))))[1]
         @test objective(m, dobj, pm) == sum(values(ep_ts[ts])[1] * consumption(eq, p1, ts) for ts in eachTimeStep(t))
         @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == sum(ep[ts + 1] * consumption(eq, p1, date + Hour(ts)) for ts in 1:7)

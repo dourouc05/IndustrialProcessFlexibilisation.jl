@@ -302,7 +302,15 @@ electricityPrice(eo::EnergyObjective) = eo.electricityPrice
 """
 Retrieves the energy price at time `d`.
 """
-electricityPrice(eo::EnergyObjective, d::DateTime) = electricityPrice(eo)[d].values[1]
+function electricityPrice(eo::EnergyObjective, d::DateTime) 
+  ts = electricityPrice(eo)
+  if d < minimum(ts.timestamp)
+    error("$d is before the first known electricity price, which is at $(minimum(ts.timestamp))")
+  elseif d > maximum(ts.timestamp)
+    error("$d is after the last known electricity price, which is at $(maximum(ts.timestamp))")
+  end
+  return electricityPrice(eo)[d].values[1]
+end
 
 function objectiveTimeStep(m::Model, eo::EnergyObjective, pm::PlantModel, d::DateTime)
   expr = AffExpr()

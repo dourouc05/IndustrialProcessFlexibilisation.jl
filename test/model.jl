@@ -931,34 +931,34 @@
   #       @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == AffExpr()
   #     end
 
-  #     @testset "Energy objective: normal case" begin
-  #       e = Equipment("EAF", :eaf)
-  #       p = Plant([e], Route[])
-  #       c = ConstantConsumption(2.0)
-  #       p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
+      # @testset "Energy objective: normal case" begin
+      #   e = Equipment("EAF", :eaf)
+      #   p = Plant([e], Route[])
+      #   c = ConstantConsumption(2.0)
+      #   p1 = Product("Steel", Dict{Equipment, ConsumptionModel}(e => c), Dict{Equipment, Tuple{Float64, Float64}}(e => (120.0, 150.0)))
 
-  #       date = DateTime(2017, 01, 01, 08)
-  #       ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
-  #       t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
-  #       s = Shifts(t, date, Hour(8))
+      #   date = DateTime(2017, 01, 01, 08)
+      #   ob = OrderBook(Dict(date + Hour(1) => (p1, 50.)))
+      #   t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+      #   s = Shifts(t, date, Hour(8))
 
-  #       m = Model(solver=CbcSolver(logLevel=0))
-  #       pm = PlantModel(m, p, ob, t, s)
+      #   m = Model(solver=CbcSolver(logLevel=0))
+      #   pm = PlantModel(m, p, ob, t, s)
 
-  #       ep = [rand() for _ in eachTimeStep(t)]
-  #       ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
-  #       dobj = EnergyObjective(ep_ts, t)
+      #   ep = [rand() for _ in eachTimeStep(t)]
+      #   ep_ts = TimeArray(collect(eachTimeStep(t)), ep)
+      #   dobj = EnergyObjective(ep_ts, t)
 
-  #       @test electricityPrice(dobj, date) == ep[1]
-  #       @test electricityPrice(dobj, date + Hour(1)) == ep[2]
-  #       @test_throws ErrorException electricityPrice(dobj, date - Hour(1)) 
-  #       @test_throws ErrorException electricityPrice(dobj, date + Week(1) + Hour(1)) 
       #   @test electricityPrice(dobj) == ep_ts
+      #   @test electricityPrice(dobj, date) == ep[1]
+      #   @test electricityPrice(dobj, date + Hour(1)) == ep[2]
+      #   @test_throws ErrorException electricityPrice(dobj, date - Hour(1)) 
+      #   @test_throws ErrorException electricityPrice(dobj, date + Week(1) + Hour(1)) 
         
-  #       eq = collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm))))[1]
-  #       @test objective(m, dobj, pm) == sum(values(ep_ts[ts])[1] * consumption(eq, p1, ts) for ts in eachTimeStep(t))
-  #       @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == sum(ep[ts + 1] * consumption(eq, p1, date + Hour(ts)) for ts in 1:7)
-  #     end
+      #   eq = collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, values(equipmentModels(pm))))[1]
+      #   @test objective(m, dobj, pm) == sum(values(ep_ts[ts])[1] * consumption(eq, p1, ts) for ts in eachTimeStep(t))
+      #   @test objective(m, dobj, pm, date + Hour(1), date + Hour(8)) == sum(ep[ts + 1] * consumption(eq, p1, date + Hour(ts)) for ts in 1:7)
+      # end
 
   #     @testset "Energy objective: not enough data" begin
   #       e = Equipment("EAF", :eaf)
@@ -1633,6 +1633,7 @@
       @testset "Two processes, two time steps, one product" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
         t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
+        t = Timing(timeBeginning=date, timeHorizon=Hour(8), timeStepDuration=Hour(1))
         s = Shifts(t, date, Hour(8))
 
         getModel(trf=1.) = begin
@@ -1744,8 +1745,9 @@
           @testset "In and out flows with transformation rate" begin
             e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel(0.99)
             @constraint(m, timeStepOpen(hrm, date) == 1.)
-            @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
-            @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm, from=timeBeginning(hrm) + Hour(16))) == 0.)
+            # @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+            # @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm, from=timeBeginning(hrm) + Hour(16))) == 0.)
+            # @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm, from=timeBeginning(hrm) + Hour(8))) == 0.)
             @objective(m, Max, sum(flowOut(inm, d, p) for d in eachTimeStep(hrm)))
             solve(m)
 
@@ -1761,9 +1763,12 @@
             # Time shift between the input and the output for the same process! 
             @test .99 * getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-2] ≈ getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[3:end] atol=1.e-4
             @test .99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-2] ≈ getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[3:end] atol=1.e-4
+            println(getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-2])
             println(getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-2])
             println(.99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-2])
             println(getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[3:end])
+            println(getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])[3:end])
+            writeLP(m, "f:/m.lp", genericnames=false)
             
             # Effect on the overall values, with the transformation rates at the output. 
             @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ ((16 - 2) * 150. / 2 * .99 * .99) atol=1.e-4 

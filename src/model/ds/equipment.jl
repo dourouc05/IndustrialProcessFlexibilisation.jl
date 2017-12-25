@@ -189,12 +189,19 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       end
     end
 
-    # TODO: Only for non-continuous processes when they have a duration.
+    # TODO: Only for non-continuous processes when they have a duration over one time step.
     # When starting, an equipment must remain on for a given number of time periods.
     if nTimeSteps(eq, processTime(eq)) > 1 
-      for d2 in eachTimeStep(eq, from=d, to=d + minimumUpTime(eq))
+      for d2 in eachTimeStep(eq, from=d, duration=minimumUpTime(eq))
         @constraint(m, on(eq, d2) >= start(eq, d))
       end
+    end
+
+    # TODO: Only for non-continuous processes when they have a duration over one time step.
+    # If the process lasts T time steps, for every consecutive T time steps, it might start only once.
+    if nTimeSteps(eq, processTime(eq)) > 1 && d + minimumUpTime(eq) <= timeEnding(eq)
+      # duration is not inclusive. 
+      @constraint(m, sum(start(eq, d2) for d2 in eachTimeStep(eq, from=d, duration=minimumUpTime(eq) + timeStepDuration(eq))) <= 1)
     end
 
     # The process may only be running or starting when the current time step is allowed. 
@@ -204,7 +211,6 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     end
     @constraint(m, on(eq, d) <= timeStepOpen(hrm, d))
 
-    # TODO: Strengthen formulation: the equipment can start at most once in any time period of the process duration.
     # TODO: Strengthen formulation: if an equipment is on, it was started within the minimumUpTime last previous time steps.
     # TODO: Functionality: maximum up time; same with down.
 

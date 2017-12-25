@@ -14,7 +14,8 @@ function smooth(ts::TimeArray, daysExact::Int, daysSmoothed::Int, daysApproximat
   values = ts[beginning : Hour(1) : beginning + Day(daysExact)].values[1:end-1]
 
   # Second, the (slightly) smoothed part. Use moving average for this.
-  smoothedTS = moving(ts[beginning + Day(daysExact) - Day(1) : Hour(1) : beginning + Day(daysExact + daysSmoothed) + Hour(smoothingConstant) + Day(1)], mean, smoothingConstant) # The first smoothingConstant-1 values disappear!
+  tsToSmooth = ts[beginning + Day(daysExact) - Day(1) : Hour(1) : beginning + Day(daysExact + daysSmoothed) + Hour(smoothingConstant) + Day(1)]
+  smoothedTS = moving(mean, ts, smoothingConstant) # The first smoothingConstant-1 values disappear!
   push!(values, smoothedTS[beginning + Day(daysExact) + Hour(smoothingConstant - 6) : Hour(1) : beginning + Day(daysExact + daysSmoothed) + Hour(smoothingConstant - 6)].values[1:end-1]...)
 
   # Third, the approximate part (highly smoothed). Use a Gaussian filter for this (forward and backward).

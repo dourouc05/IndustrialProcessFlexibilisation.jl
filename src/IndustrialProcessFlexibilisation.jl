@@ -32,7 +32,7 @@ module IndustrialProcessFlexibilisation
          TimingModel,
          PlantModel
   export postConstraints, timing, orderBook
-  export equipment, quantity, flowIn, flowOut, on, off, start, stop, currentProduct, checkDate, productId,
+  export equipment, quantityAfter, quantityBefore, quantity, flowIn, flowOut, on, off, start, stop, currentProduct, checkDate, productId,
          origin, destination, timing, orderBook, minimumValue, maximumValue, orderBookDetails,
          objectiveTimeStep, objectiveShift, objective, objectives, symbols, weights, weight, nObjectives, objectiveObject, objective, symbol, weight, nonzeroObjectives, hasObjective, electricityPrice, hrPrice,
          timing, shifts, shiftOpen, shiftOpen, timeStepOpen,

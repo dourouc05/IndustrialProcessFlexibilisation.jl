@@ -147,7 +147,12 @@
         @test_throws(MethodError, minBatchSize(p, oum))
 
         # Accessing variables (low level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm) == eqm.quantityBefore)
+        @test(quantityAfter(eqm) == eqm.quantityAfter)
+        @test(quantity(eqm) == eqm.quantityAfter)
+        for em in [inm, oum]
+          @test(quantityBefore(em) == em.quantity)
+          @test(quantityAfter(em) == em.quantity)
           @test(quantity(em) == em.quantity)
         end
         @test(flowIn(eqm) == eqm.flowIn)
@@ -164,7 +169,12 @@
         end
 
         # Accessing variables (high level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm, 1, 1) == eqm.quantityBefore[1, 1])
+        @test(quantityAfter(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        @test(quantity(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        for em in [inm, oum]
+          @test(quantityBefore(em, 1, 1) == em.quantity[1, 1])
+          @test(quantityAfter(em, 1, 1) == em.quantity[1, 1])
           @test(quantity(em, 1, 1) == em.quantity[1, 1])
         end
         @test(flowIn(eqm, 1, 1) == eqm.flowIn[1, 1])
@@ -191,7 +201,17 @@
 
         @test(productId(eqm, p) == 1)
 
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm, date, p) == eqm.quantityBefore[1, 1])
+        @test(quantityBefore(eqm, date + Hour(1), p) == eqm.quantityBefore[2, 1])
+        @test(quantityAfter(eqm, date, p) == eqm.quantityAfter[1, 1])
+        @test(quantityAfter(eqm, date + Hour(1), p) == eqm.quantityAfter[2, 1])
+        @test(quantity(eqm, date, p) == eqm.quantityAfter[1, 1])
+        @test(quantity(eqm, date + Hour(1), p) == eqm.quantityAfter[2, 1])
+        for em in [inm, oum]
+          @test(quantityBefore(em, date, p) == em.quantity[1, 1])
+          @test(quantityBefore(em, date + Hour(1), p) == em.quantity[2, 1])
+          @test(quantityAfter(em, date, p) == em.quantity[1, 1])
+          @test(quantityAfter(em, date + Hour(1), p) == em.quantity[2, 1])
           @test(quantity(em, date, p) == em.quantity[1, 1])
           @test(quantity(em, date + Hour(1), p) == em.quantity[2, 1])
         end
@@ -302,7 +322,12 @@
         end
 
         # Accessing variables (low level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm) == eqm.quantityBefore)
+        @test(quantityAfter(eqm) == eqm.quantityAfter)
+        @test(quantity(eqm) == eqm.quantityAfter)
+        for em in [inm, oum]
+          @test(quantityBefore(em) == em.quantity)
+          @test(quantityAfter(em) == em.quantity)
           @test(quantity(em) == em.quantity)
         end
         @test(flowIn(eqm) == eqm.flowIn)
@@ -319,7 +344,12 @@
         end
 
         # Accessing variables (high level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm, 1, 1) == eqm.quantityBefore[1, 1])
+        @test(quantityAfter(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        @test(quantity(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        for em in [inm, oum]
+          @test(quantityBefore(em, 1, 1) == em.quantity[1, 1])
+          @test(quantityAfter(em, 1, 1) == em.quantity[1, 1])
           @test(quantity(em, 1, 1) == em.quantity[1, 1])
         end
         @test(flowIn(eqm, 1, 1) == eqm.flowIn[1, 1])
@@ -347,8 +377,20 @@
 
         @test(all(sort([productId(eqm, p1), productId(eqm, p2)]) .== [1, 2]))
 
-        for em in [eqm, inm, oum]
+        for p in [p1, p2]
+          @test(quantityBefore(eqm, date, p) == eqm.quantityBefore[1, productId(eqm, p)])
+          @test(quantityBefore(eqm, date + Hour(1), p) == eqm.quantityBefore[2, productId(eqm, p)])
+          @test(quantityAfter(eqm, date, p) == eqm.quantityAfter[1, productId(eqm, p)])
+          @test(quantityAfter(eqm, date + Hour(1), p) == eqm.quantityAfter[2, productId(eqm, p)])
+          @test(quantity(eqm, date, p) == eqm.quantityAfter[1, productId(eqm, p)])
+          @test(quantity(eqm, date + Hour(1), p) == eqm.quantityAfter[2, productId(eqm, p)])
+        end
+        for em in [inm, oum]
           for p in [p1, p2]
+            @test(quantityBefore(em, date, p) == em.quantity[1, productId(eqm, p)])
+            @test(quantityBefore(em, date + Hour(1), p) == em.quantity[2, productId(eqm, p)])
+            @test(quantityAfter(em, date, p) == em.quantity[1, productId(eqm, p)])
+            @test(quantityAfter(em, date + Hour(1), p) == em.quantity[2, productId(eqm, p)])
             @test(quantity(em, date, p) == em.quantity[1, productId(eqm, p)])
             @test(quantity(em, date + Hour(1), p) == em.quantity[2, productId(eqm, p)])
           end
@@ -461,7 +503,12 @@
         @test_throws(MethodError, minBatchSize(p, oum))
 
         # Accessing variables (low level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm) == eqm.quantityBefore)
+        @test(quantityAfter(eqm) == eqm.quantityAfter)
+        @test(quantity(eqm) == eqm.quantityAfter)
+        for em in [inm, oum]
+          @test(quantityBefore(em) == em.quantity)
+          @test(quantityAfter(em) == em.quantity)
           @test(quantity(em) == em.quantity)
         end
         @test(flowIn(eqm) == eqm.flowIn)
@@ -478,7 +525,12 @@
         end
 
         # Accessing variables (high level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm, 1, 1) == eqm.quantityBefore[1, 1])
+        @test(quantityAfter(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        @test(quantity(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        for em in [inm, oum]
+          @test(quantityBefore(em, 1, 1) == em.quantity[1, 1])
+          @test(quantityAfter(em, 1, 1) == em.quantity[1, 1])
           @test(quantity(em, 1, 1) == em.quantity[1, 1])
         end
         @test(flowIn(eqm, 1, 1) == eqm.flowIn[1, 1])
@@ -505,7 +557,22 @@
 
         @test(productId(eqm, p) == 1)
 
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm, date, p) == eqm.quantityBefore[1, 1])
+        @test(quantityBefore(eqm, date + Minute(15), p) == eqm.quantityBefore[2, 1])
+        @test(quantityBefore(eqm, date + Hour(1), p) == eqm.quantityBefore[5, 1])
+        @test(quantityAfter(eqm, date, p) == eqm.quantityAfter[1, 1])
+        @test(quantityAfter(eqm, date + Minute(15), p) == eqm.quantityAfter[2, 1])
+        @test(quantityAfter(eqm, date + Hour(1), p) == eqm.quantityAfter[5, 1])
+        @test(quantity(eqm, date, p) == eqm.quantityAfter[1, 1])
+        @test(quantity(eqm, date + Minute(15), p) == eqm.quantityAfter[2, 1])
+        @test(quantity(eqm, date + Hour(1), p) == eqm.quantityAfter[5, 1])
+        for em in [inm, oum]
+          @test(quantityBefore(em, date, p) == em.quantity[1, 1])
+          @test(quantityBefore(em, date + Minute(15), p) == em.quantity[2, 1])
+          @test(quantityBefore(em, date + Hour(1), p) == em.quantity[5, 1])
+          @test(quantityAfter(em, date, p) == em.quantity[1, 1])
+          @test(quantityAfter(em, date + Minute(15), p) == em.quantity[2, 1])
+          @test(quantityAfter(em, date + Hour(1), p) == em.quantity[5, 1])
           @test(quantity(em, date, p) == em.quantity[1, 1])
           @test(quantity(em, date + Minute(15), p) == em.quantity[2, 1])
           @test(quantity(em, date + Hour(1), p) == em.quantity[5, 1])
@@ -623,7 +690,12 @@
         end
 
         # Accessing variables (low level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm) == eqm.quantityBefore)
+        @test(quantityAfter(eqm) == eqm.quantityAfter)
+        @test(quantity(eqm) == eqm.quantityAfter)
+        for em in [inm, oum]
+          @test(quantityBefore(em) == em.quantity)
+          @test(quantityAfter(em) == em.quantity)
           @test(quantity(em) == em.quantity)
         end
         @test(flowIn(eqm) == eqm.flowIn)
@@ -640,7 +712,12 @@
         end
 
         # Accessing variables (high level).
-        for em in [eqm, inm, oum]
+        @test(quantityBefore(eqm, 1, 1) == eqm.quantityBefore[1, 1])
+        @test(quantityAfter(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        @test(quantity(eqm, 1, 1) == eqm.quantityAfter[1, 1])
+        for em in [inm, oum]
+          @test(quantityBefore(em, 1, 1) == em.quantity[1, 1])
+          @test(quantityAfter(em, 1, 1) == em.quantity[1, 1])
           @test(quantity(em, 1, 1) == em.quantity[1, 1])
         end
         @test(flowIn(eqm, 1, 1) == eqm.flowIn[1, 1])
@@ -668,8 +745,25 @@
 
         @test(all(sort([productId(eqm, p1), productId(eqm, p2)]) .== [1, 2]))
 
-        for em in [eqm, inm, oum]
+        for p in [p1, p2]
+          @test(quantityBefore(eqm, date, p) == eqm.quantityBefore[1, productId(eqm, p)])
+          @test(quantityBefore(eqm, date + Minute(15), p) == eqm.quantityBefore[2, productId(eqm, p)])
+          @test(quantityBefore(eqm, date + Hour(1), p) == eqm.quantityBefore[5, productId(eqm, p)])
+          @test(quantityAfter(eqm, date, p) == eqm.quantityAfter[1, productId(eqm, p)])
+          @test(quantityAfter(eqm, date + Minute(15), p) == eqm.quantityAfter[2, productId(eqm, p)])
+          @test(quantityAfter(eqm, date + Hour(1), p) == eqm.quantityAfter[5, productId(eqm, p)])
+          @test(quantity(eqm, date, p) == eqm.quantityAfter[1, productId(eqm, p)])
+          @test(quantity(eqm, date + Minute(15), p) == eqm.quantityAfter[2, productId(eqm, p)])
+          @test(quantity(eqm, date + Hour(1), p) == eqm.quantityAfter[5, productId(eqm, p)])
+        end
+        for em in [inm, oum]
           for p in [p1, p2]
+            @test(quantityBefore(em, date, p) == em.quantity[1, productId(eqm, p)])
+            @test(quantityBefore(em, date + Minute(15), p) == em.quantity[2, productId(eqm, p)])
+            @test(quantityBefore(em, date + Hour(1), p) == em.quantity[5, productId(eqm, p)])
+            @test(quantityAfter(em, date, p) == em.quantity[1, productId(eqm, p)])
+            @test(quantityAfter(em, date + Minute(15), p) == em.quantity[2, productId(eqm, p)])
+            @test(quantityAfter(em, date + Hour(1), p) == em.quantity[5, productId(eqm, p)])
             @test(quantity(em, date, p) == em.quantity[1, productId(eqm, p)])
             @test(quantity(em, date + Minute(15), p) == em.quantity[2, productId(eqm, p)])
             @test(quantity(em, date + Hour(1), p) == em.quantity[5, productId(eqm, p)])
@@ -1360,7 +1454,7 @@
             @objective(m, Max, sum(on(eqm, d) for d in eachTimeStep(hrm)))
             solve(m)
 
-            @test getobjectivevalue(m) == 8.
+            @test getobjectivevalue(m) ≈ 8.
             @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 8. 
           end
         end
@@ -1462,7 +1556,7 @@
 
             # Each machine is on for one time step. However, the model only works by shifts, hence allow one shift (8 hours, 8 time steps per machine).
             # Due to the processing times, cannot reach 2*8. 
-            @test getobjectivevalue(m) == 2 * 8. - 1
+            @test getobjectivevalue(m) ≈ 2 * 8. - 1
             # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
             # and 1*0 or 1*1 for the two allowed ones). 
             @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 
@@ -1564,7 +1658,7 @@
             @objective(m, Max, sum(on(eqm, d) for d in eachTimeStep(hrm)))
             solve(m)
 
-            @test getobjectivevalue(m) == 8.
+            @test getobjectivevalue(m) ≈ 8.
             @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 8. 
           end
 
@@ -1616,8 +1710,8 @@
             @test getvalue(flowOut(eqm, date, p)) == .0
 
             # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-            @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
-            @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+            @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
             # Flows at the borders of a process are affected by the transformation rate. 
             # Time shift between the input and the output for the same process! 
@@ -1683,7 +1777,7 @@
      
             # This also checks whether dependencies between processes are well encoded: if one value is not 8, then 
             # the output of some processes is lost. 
-            @test getobjectivevalue(m) == 6.
+            @test getobjectivevalue(m) ≈ 6.
             @test sum(getvalue([on(eq1m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 6. 
             @test sum(getvalue([on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 6 
           end
@@ -1812,7 +1906,7 @@
             @objective(m, Max, sum(on(eqm, d) for d in eachTimeStep(hrm)))
             solve(m)
 
-            @test getobjectivevalue(m) == 8.
+            @test getobjectivevalue(m) ≈ 8.
             @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 8. 
           end
         end
@@ -1919,7 +2013,7 @@
 
             # Each machine is on for one time step. However, the model only works by shifts, hence allow one shift (8 hours, 8 time steps per machine).
             # Due to the processing times, cannot reach 2*8. 
-            @test getobjectivevalue(m) == 2 * 8. - 1
+            @test getobjectivevalue(m) ≈ 2 * 8. - 1
             # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
             # and 1*0 or 1*1 for the two allowed ones). 
             @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 

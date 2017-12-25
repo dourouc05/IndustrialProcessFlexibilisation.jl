@@ -152,6 +152,12 @@ quantityBefore(eq::ImplicitEquipmentModel) = eq.quantity
 quantityAfter(eq::ImplicitEquipmentModel) = eq.quantity
 quantity(eq::ImplicitEquipmentModel) = eq.quantity
 
+quantityBefore(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = quantityBefore(eq)[ts, nProduct]
+quantityAfter(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = quantityAfter(eq)[ts, nProduct]
+quantity(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantity[ts, nProduct]
+flowIn(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :out; quantityBefore(eq)[ts, nProduct]; else; error("Implicit in equipment has no flow in."); end
+flowOut(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :in; quantityAfter(eq)[ts, nProduct]; else; error("Implicit out equipment has no flow out."); end
+
 # Specific model accessors: high level.
 quantityBefore(eq::EquipmentModel, ts::Int, nProduct::Int) = quantityBefore(eq)[ts, nProduct]
 quantityAfter(eq::EquipmentModel, ts::Int, nProduct::Int) = quantityAfter(eq)[ts, nProduct]
@@ -161,12 +167,6 @@ flowOut(eq::EquipmentModel, ts::Int, nProduct::Int) = flowOut(eq)[ts, nProduct]
 on(eq::EquipmentModel, ts::Int) = on(eq)[ts]
 start(eq::EquipmentModel, ts::Int) = start(eq)[ts]
 currentProduct(eq::EquipmentModel, ts::Int, nProduct::Int) = if nProducts(eq) > 1; currentProduct(eq)[ts, nProduct]; else; error("Only one product, currentProduct makes no sense"); end
-
-quantityBefore(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantityBefore[ts, nProduct]
-quantityAfter(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantityAfter[ts, nProduct]
-quantity(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantity[ts, nProduct]
-flowIn(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :out; quantityBefore(eq)[ts, nProduct]; else; error("Implicit in equipment has no flow in."); end
-flowOut(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :in; quantityAfter(eq)[ts, nProduct]; else; error("Implicit out equipment has no flow out."); end
 
 # Easy-to-use model accessors.
 function checkDate(eq::AbstractEquipmentModel, d::DateTime, variable::Symbol) # TODO: To test! Same with the following function when they used to error.

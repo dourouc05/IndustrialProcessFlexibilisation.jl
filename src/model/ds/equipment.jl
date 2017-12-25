@@ -214,7 +214,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       for p in products(eq)
         if d > timeBeginning(eq)
           @constraint(m, quantity(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) + flowIn(eq, d, p) - flowOut(eq, d, p) / transformationRate(eq))
-        elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! For now, was empty.
+        elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! I.e. initial conditions. For now, was empty.
           @constraint(m, quantity(eq, d, p) == flowIn(eq, d, p))
           # No outflow ensured by the minimum and maximum flows for the process (when d is before the processing time). 
         end
@@ -225,7 +225,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
         if d > timeBeginning(eq)
           @constraint(m, flowIn(eq, d - timeStepDuration(eq), p) == flowOut(eq, d, p) / transformationRate(eq))
         elseif d == timeBeginning(eq) 
-          # No outflow ensured by the minimum and maximum flows for the process (when d is before the  process time). 
+          # No outflow ensured by the minimum and maximum flows for the process (when d is before the process time). 
         end
       end
     end
@@ -304,6 +304,12 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       else
         @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
       end
+      # if maxFlowIn != minFlowIn
+      #   @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) <= maxFlowIn * stop(eq, d) / transformationRate(eq))
+      #   @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= minFlowIn * stop(eq, d) / transformationRate(eq))
+      # else
+      #   @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == maxFlowIn * stop(eq, d) / transformationRate(eq))
+      # end
     end
   end
 end

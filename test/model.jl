@@ -1633,7 +1633,6 @@
       @testset "Two processes, two time steps, one product" begin
         date = DateTime(2017, 01, 01, 12, 32, 42)
         t = Timing(timeBeginning=date, timeHorizon=Week(1), timeStepDuration=Hour(1))
-        t = Timing(timeBeginning=date, timeHorizon=Hour(8), timeStepDuration=Hour(1))
         s = Shifts(t, date, Hour(8))
 
         getModel(trf=1.) = begin
@@ -1745,9 +1744,8 @@
           @testset "In and out flows with transformation rate" begin
             e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel(0.99)
             @constraint(m, timeStepOpen(hrm, date) == 1.)
-            # @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
-            # @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm, from=timeBeginning(hrm) + Hour(16))) == 0.)
-            # @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm, from=timeBeginning(hrm) + Hour(8))) == 0.)
+            @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+            @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm, from=timeBeginning(hrm) + Hour(16))) == 0.)
             @objective(m, Max, sum(flowOut(inm, d, p) for d in eachTimeStep(hrm)))
             solve(m)
 
@@ -1763,12 +1761,6 @@
             # Time shift between the input and the output for the same process! 
             @test .99 * getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-2] ≈ getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[3:end] atol=1.e-4
             @test .99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-2] ≈ getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[3:end] atol=1.e-4
-            println(getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-2])
-            println(getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-2])
-            println(.99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-2])
-            println(getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[3:end])
-            println(getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])[3:end])
-            writeLP(m, "f:/m.lp", genericnames=false)
             
             # Effect on the overall values, with the transformation rates at the output. 
             @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ ((16 - 2) * 150. / 2 * .99 * .99) atol=1.e-4 

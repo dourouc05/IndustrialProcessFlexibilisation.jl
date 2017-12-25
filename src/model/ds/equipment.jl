@@ -14,25 +14,34 @@ struct EquipmentModel <: AbstractEquipmentModel
   timing::Timing
   ob::OrderBook
 
-  quantity::Array{JuMP.Variable, 2}
+  # How updates happen to the quantity of material stored within the equipment: 
+  # - at the beginning of a time step: has quantityAfter of the previous time step
+  # - just after, empty the equipment: remove flowOut
+  # - then, new inventory: has quantityBefore
+  # - finally, pour in new material: add flowIn
+  # - final inventory: has quantityAfter
+  # Implicitly, the quantity is that final inventory. 
+  quantityBefore::Array{JuMP.Variable, 2}
+  quantityAfter::Array{JuMP.Variable, 2}
   flowIn::Array{JuMP.Variable, 2}
   flowOut::Array{JuMP.Variable, 2}
+
   on::Array{JuMP.Variable, 1}
   start::Array{JuMP.Variable, 1}
   currentProduct::Array{JuMP.Variable, 2}
 
   function EquipmentModel(m::Model, eq::Equipment, timing::Timing, ob::OrderBook)
     # Basic model variables.
-    flowIn  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
-    flowOut = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
-    on      = @variable(m, [t=1:nTimeSteps(timing)], Bin)
+    quantityBefore = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound= 0)
+    quantityAfter  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound= 0)
+    flowIn         = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
+    flowOut        = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
+    on             = @variable(m, [t=1:nTimeSteps(timing)], Bin)
 
-    # If a process lasts for more than one time step, its quantity is not exactly what flows in, and it must be started.
+    # If a process lasts for more than one time step, it must be started.
     if nTimeSteps(timing, processTime(eq)) > 1
-      quantity = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound= 0)
       start    = @variable(m, [t=1:nTimeSteps(timing)], Bin)
     else
-      quantity = flowIn
       start = on
     end
 
@@ -49,14 +58,14 @@ struct EquipmentModel <: AbstractEquipmentModel
 
       if nTimeSteps(timing, processTime(eq)) > 1
         setname(start[t], "equipment_start_$(name(eq))_$(t)")
-        for p in 1:nProducts(ob)
-          setname(quantity[t, p], "equipment_quantity_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
-        end
       end
 
       for p in 1:nProducts(ob)
+        setname(quantityBefore[t, p], "equipment_quantitybefore_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+        setname(quantityAfter[t, p],  "equipment_quantityafter_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
         setname(flowIn[t, p],  "equipment_flowIn_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
         setname(flowOut[t, p], "equipment_flowOut_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+
         if nProducts(ob) > 1
           setname(currentProduct[t, p],  "equipment_currentProduct_$(name(eq))_$(t)_prod$(p)")
         end
@@ -64,7 +73,7 @@ struct EquipmentModel <: AbstractEquipmentModel
     end
 
     # Done!
-    return new(eq, timing, ob, quantity, flowIn, flowOut, on, start, currentProduct)
+    return new(eq, timing, ob, quantityBefore, quantityAfter, flowIn, flowOut, on, start, currentProduct)
   end
 end
 
@@ -129,7 +138,9 @@ maxBatchSize(p::Product, eq::EquipmentModel) = maxBatchSize(p, equipment(eq))
 minBatchSize(p::Product, eq::EquipmentModel) = minBatchSize(p, equipment(eq))
 
 # Specific model accessors: low level.
-quantity(eq::AbstractEquipmentModel) = eq.quantity
+quantityBefore(eq::EquipmentModel) = eq.quantityBefore
+quantityAfter(eq::EquipmentModel) = eq.quantityAfter
+quantity(eq::EquipmentModel) = eq.quantityAfter
 flowIn(eq::EquipmentModel) = eq.flowIn
 flowOut(eq::EquipmentModel) = eq.flowOut
 on(eq::EquipmentModel) = eq.on
@@ -137,7 +148,13 @@ start(eq::EquipmentModel) = eq.start
 currentProduct(eq::EquipmentModel) = eq.currentProduct
 currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the up/downstream piece of equipment.")
 
+quantityBefore(eq::ImplicitEquipmentModel) = eq.quantity
+quantityAfter(eq::ImplicitEquipmentModel) = eq.quantity
+quantity(eq::ImplicitEquipmentModel) = eq.quantity
+
 # Specific model accessors: high level.
+quantityBefore(eq::EquipmentModel, ts::Int, nProduct::Int) = quantityBefore(eq)[ts, nProduct]
+quantityAfter(eq::EquipmentModel, ts::Int, nProduct::Int) = quantityAfter(eq)[ts, nProduct]
 quantity(eq::EquipmentModel, ts::Int, nProduct::Int) = quantity(eq)[ts, nProduct]
 flowIn(eq::EquipmentModel, ts::Int, nProduct::Int) = flowIn(eq)[ts, nProduct]
 flowOut(eq::EquipmentModel, ts::Int, nProduct::Int) = flowOut(eq)[ts, nProduct]
@@ -145,9 +162,11 @@ on(eq::EquipmentModel, ts::Int) = on(eq)[ts]
 start(eq::EquipmentModel, ts::Int) = start(eq)[ts]
 currentProduct(eq::EquipmentModel, ts::Int, nProduct::Int) = if nProducts(eq) > 1; currentProduct(eq)[ts, nProduct]; else; error("Only one product, currentProduct makes no sense"); end
 
+quantityBefore(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantityBefore[ts, nProduct]
+quantityAfter(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantityAfter[ts, nProduct]
 quantity(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantity[ts, nProduct]
-flowIn(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :out; quantity(eq)[ts, nProduct]; else; error("Implicit in equipment has no flow in."); end
-flowOut(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :in; quantity(eq)[ts, nProduct]; else; error("Implicit out equipment has no flow out."); end
+flowIn(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :out; quantityBefore(eq)[ts, nProduct]; else; error("Implicit in equipment has no flow in."); end
+flowOut(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :in; quantityAfter(eq)[ts, nProduct]; else; error("Implicit out equipment has no flow out."); end
 
 # Easy-to-use model accessors.
 function checkDate(eq::AbstractEquipmentModel, d::DateTime, variable::Symbol) # TODO: To test! Same with the following function when they used to error.
@@ -161,6 +180,8 @@ function checkDate(eq::AbstractEquipmentModel, d::DateTime, variable::Symbol) # 
 end
 
 productId(eq::AbstractEquipmentModel, p::Product) = productIds(eq)[p]
+quantityBefore(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :quantity) && quantityBefore(eq, dateToTimeStep(eq, d), productId(eq, p))
+quantityAfter(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :quantity) && quantityAfter(eq, dateToTimeStep(eq, d), productId(eq, p))
 quantity(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :quantity) && quantity(eq, dateToTimeStep(eq, d), productId(eq, p))
 flowIn(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :flowIn) && flowIn(eq, dateToTimeStep(eq, d), productId(eq, p))
 flowOut(eq::AbstractEquipmentModel, d::DateTime, p::Product) = checkDate(eq, d, :flowOut) && flowOut(eq, dateToTimeStep(eq, d), productId(eq, p))
@@ -219,9 +240,11 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     if nTimeSteps(eq, processTime(eq)) > 1
       for p in products(eq)
         if d > timeBeginning(eq)
-          @constraint(m, quantity(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) + flowIn(eq, d, p) - flowOut(eq, d, p) / transformationRate(eq))
+          @constraint(m, quantityBefore(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) - flowOut(eq, d, p) / transformationRate(eq))
+          @constraint(m, quantityAfter(eq, d, p) == quantityBefore(eq, d, p) + flowIn(eq, d, p))
         elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! I.e. initial conditions. For now, was empty.
           @constraint(m, quantity(eq, d, p) == flowIn(eq, d, p))
+          @constraint(m, quantityAfter(eq, d, p) == quantityBefore(eq, d, p))
           # No outflow ensured by the minimum and maximum flows for the process (when d is before the processing time). 
         end
       end

@@ -61,8 +61,8 @@ struct EquipmentModel <: AbstractEquipmentModel
       end
 
       for p in 1:nProducts(ob)
-        setname(quantityBefore[t, p], "equipment_quantitybefore_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
-        setname(quantityAfter[t, p],  "equipment_quantityafter_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+        setname(quantityBefore[t, p], "equipment_quantityBefore_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+        setname(quantityAfter[t, p],  "equipment_quantityAfter_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
         setname(flowIn[t, p],  "equipment_flowIn_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
         setname(flowOut[t, p], "equipment_flowOut_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
 
@@ -210,19 +210,31 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     end
 
     # TODO: Only for non-continuous processes when they have a duration over one time step.
-    # When starting, an equipment must remain on for a given number of time periods.
-    if nTimeSteps(eq, processTime(eq)) > 1 
-      for d2 in eachTimeStep(eq, from=d, duration=minimumUpTime(eq))
+    # When starting, an equipment must remain on for a given number of time periods (at least processTime).
+    if nTimeSteps(eq, processTime(eq)) > 1 && d + processTime(eq) <= timeEnding(eq)
+      for d2 in eachTimeStep(eq, from=d, duration=processTime(eq))
         @constraint(m, on(eq, d2) >= start(eq, d))
       end
     end
 
     # TODO: Only for non-continuous processes when they have a duration over one time step.
-    # If the process lasts T time steps, for every consecutive T time steps, it might start only once.
-    if nTimeSteps(eq, processTime(eq)) > 1 && d + minimumUpTime(eq) <= timeEnding(eq)
-      # duration is not inclusive. 
-      @constraint(m, sum(start(eq, d2) for d2 in eachTimeStep(eq, from=d, duration=minimumUpTime(eq) + timeStepDuration(eq))) <= 1)
+    # If an equipment is on, it must have been started within the processTime last previous time steps.
+    if nTimeSteps(eq, processTime(eq)) > 1 && d + processTime(eq) <= timeEnding(eq)
+      # duration is not inclusive, hence +1 time step. 
+      @constraint(m, on(eq, d) <= sum(start(eq, d2) for d2 in eachTimeStep(eq, from=max(d - processTime(eq), timeBeginning(hrm)), duration=processTime(eq) + timeStepDuration(eq))))
     end
+
+    # TODO: Only for non-continuous processes when they have a duration over one time step.
+    # If the process lasts T time steps, for every consecutive T time steps, it might start only once.
+    if nTimeSteps(eq, processTime(eq)) > 1 && d + processTime(eq) <= timeEnding(eq)
+      # duration is not inclusive, hence +1 time step. 
+      @constraint(m, sum(start(eq, d2) for d2 in eachTimeStep(eq, from=d, duration=processTime(eq) + timeStepDuration(eq))) <= 1)
+    end
+
+    # TODO: Only for non-continuous processes when they have a duration over one time step.
+    # TODO: A similar version can be written for processes with a minimum and a maximum up time per batch. 
+    # If the process starts n times, then it must be on n * processTime.
+    # @constraint(m, sum(start(eq, d) for d in eachTimeStep(eq)) == nTimeSteps(eq, processTime(eq)) * sum(on(eq, d) for d in eachTimeStep(eq)))
 
     # The process may only be running or starting when the current time step is allowed. 
     # TODO: How to split this among the various components? Just for processes that are not continuous or at least stoppable. 
@@ -231,8 +243,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     end
     @constraint(m, on(eq, d) <= timeStepOpen(hrm, d))
 
-    # TODO: Strengthen formulation: if an equipment is on, it was started within the minimumUpTime last previous time steps.
-    # TODO: Functionality: maximum up time; same with down.
+    # TODO: Functionality: maximum up time; same with down. Quite incompatible with processTime, though. Must allow to add specific constraints with the up/down time for batch processes: e.g., a constant total electricity consumption over the period (consumes the same kWh if lasts 2 or 3 hours). 
 
     # Quantities only evolve when the flows in and out are evolving.
     # TODO: Only constraint that is really specific to a piece of equipment.

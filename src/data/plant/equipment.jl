@@ -14,10 +14,10 @@ struct Equipment <: AbstractEquipment
   kind::Symbol
   transformationRate::Float64
 
-  minimumUpTime::TimePeriod # TODO: To factor out! (Batch process that has a minimum up time.)
+  minimumUpTime::TimePeriod # TODO: To factor out! (Continuous process that has a minimum up time.)
   minimumProduction::Float64 # TODO: To factor out! (Batch process that has a min/max production.)
   maximumProduction::Float64 # TODO: To factor out!
-  processTime::TimePeriod # TODO: To factor out! (Batch process.)
+  processTime::TimePeriod # TODO: To factor out! (Batch processing time.)
 
   function Equipment(name::AbstractString, kind::Symbol, transformationRate::Float64=1.,
                      minimumUpTime::TimePeriod=Hour(1), minimumProduction::Float64=0.0, maximumProduction::Float64=1.e6,

@@ -39,7 +39,7 @@ products(f::FlowModel) = products(orderBook(f))
 nProducts(f::FlowModel) = nProducts(orderBook(f))
 
 
-function postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, AbstractEquipmentModel}) 
+function postConstraints(m::Model, f::FlowModel, hrm::TimingModel, eqs::Dict{AbstractString, AbstractEquipmentModel}) 
   if typeof(origin(f)) <: ImplicitEquipment && typeof(destination(f)) <: ImplicitEquipment
     error("Assertion failed: flow between two implicit equipments (in and out). ")
   end
@@ -47,9 +47,9 @@ function postConstraints(m::Model, f::FlowModel, eqs::Dict{AbstractString, Abstr
   for d in eachTimeStep(f)
     for p in products(f)
       @constraint(m, flowOut(eqs[name(origin(f))], d, p) == flowIn(eqs[name(destination(f))], d, p))
-      @constraint(m, flowOut(eqs[name(origin(f))], d, p) <= maximumValue(f)) # As there is no variable for a flow, the bounds must be imposed somewhere.
+      @constraint(m, flowOut(eqs[name(origin(f))], d, p) <= maximumValue(f) * timeStepOpen(hrm, d)) 
       if minimumValue(f) > 0
-        @constraint(m, flowOut(eqs[name(origin(f))], d, p) >= minimumValue(f))
+        @constraint(m, flowOut(eqs[name(origin(f))], d, p) >= minimumValue(f) * timeStepOpen(hrm, d))
       end
     end
   end

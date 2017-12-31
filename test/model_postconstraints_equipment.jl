@@ -947,7 +947,6 @@
         @test getobjectivevalue(m) ≈ (168 - 2) * 150.
       end
     end
-    end
     
     @testset "Minimum up time" begin
       # TODO: 

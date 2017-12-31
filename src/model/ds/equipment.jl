@@ -126,7 +126,6 @@ nTimeSteps(eq::AbstractEquipmentModel, d::Period) = nTimeSteps(timing(eq), d)
 nTimeSteps(eq::AbstractEquipmentModel) = nTimeSteps(timing(eq))
 dateToTimeStep(eq::AbstractEquipmentModel, d::DateTime) = dateToTimeStep(timing(eq), d)
 eachTimeStep(eq::AbstractEquipmentModel; kwargs...) = eachTimeStep(timing(eq); kwargs...)
-eachShift(eq::AbstractEquipmentModel; kwargs...) = eachShift(timing(eq); kwargs...) # TODO: To test! 
 
 # Link to the methods of OrderBook.
 products(eq::AbstractEquipmentModel) = products(orderBook(eq))

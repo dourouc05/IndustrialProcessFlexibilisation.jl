@@ -2,7 +2,7 @@ module IndustrialProcessFlexibilisation
   ## Exports for data structures (data/).
   # Genera data structures (data/)
   export Timing
-  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, nOccurrencesPerPeriod, nTimeSteps, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, nShifts, dateToTimeStep
+  export timeBeginning, timeHorizon, timeStepDuration, timeEnding, nOccurrencesPerPeriod, nTimeSteps, nDays, daysOfWeekBetween, daysOfWeekUntil, daysOfWeekFor, eachTimeStep, eachShift, nShifts, dateToTimeStep
   export Shifts
   export shiftBeginning, shiftDuration, shiftDurations, nShiftDurations, shiftDurationsStart, shiftDurationsStep, shiftDurationsStop, minimumShiftDurations, maximumShiftDurations, nTimeStepsPerShift, dateToShift, shift
   # Plant data structures (data/plant/)

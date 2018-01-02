@@ -220,8 +220,8 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     # TODO: Only for non-continuous processes when they have a duration over one time step.
     # If an equipment is on, it must have been started within the processTime last previous time steps.
     if nTimeSteps(eq, processTime(eq)) > 1 && d + processTime(eq) <= timeEnding(eq)
-      # duration is not inclusive, hence +1 time step. 
-      @constraint(m, on(eq, d) <= sum(start(eq, d2) for d2 in eachTimeStep(eq, from=max(d - processTime(eq), timeBeginning(hrm)), duration=processTime(eq) + timeStepDuration(eq))))
+      # to is not inclusive, hence +1 time step. 
+      @constraint(m, on(eq, d) <= sum(start(eq, d2) for d2 in eachTimeStep(eq, from=max(d - processTime(eq) + timeStepDuration(eq), timeBeginning(hrm)), to=d + timeStepDuration(eq))))
     end
 
     # TODO: Only for non-continuous processes when they have a duration over one time step.
@@ -234,7 +234,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     # TODO: Only for non-continuous processes when they have a duration over one time step.
     # TODO: A similar version can be written for processes with a minimum and a maximum up time per batch. 
     # If the process starts n times, then it must be on n * processTime.
-    # @constraint(m, sum(start(eq, d) for d in eachTimeStep(eq)) == nTimeSteps(eq, processTime(eq)) * sum(on(eq, d) for d in eachTimeStep(eq)))
+    @constraint(m, nTimeSteps(eq, processTime(eq)) * sum(start(eq, d) for d in eachTimeStep(eq)) == sum(on(eq, d) for d in eachTimeStep(eq)))
 
     # The process may only be running or starting when the current time step is allowed. 
     # TODO: How to split this among the various components? Just for processes that are not continuous or at least stoppable. 

@@ -227,8 +227,8 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     # TODO: Only for non-continuous processes when they have a duration over one time step.
     # If the process lasts T time steps, for every consecutive T time steps, it might start only once.
     if nTimeSteps(eq, processTime(eq)) > 1 && d + processTime(eq) <= timeEnding(eq)
-      # duration is not inclusive, hence +1 time step. 
-      @constraint(m, sum(start(eq, d2) for d2 in eachTimeStep(eq, from=d, duration=processTime(eq) + timeStepDuration(eq))) <= 1)
+      # duration is not inclusive. 
+      @constraint(m, sum(start(eq, d2) for d2 in eachTimeStep(eq, from=d, duration=processTime(eq))) <= 1)
     end
 
     # TODO: Only for non-continuous processes when they have a duration over one time step.
@@ -275,8 +275,8 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       maxFlowIn = min(maximumProduction(eq), minimum([maxBatchSize(p, eq) for p in products(eq)]))
       minFlowIn = max(minimumProduction(eq), maximum([minBatchSize(p, eq) for p in products(eq)]))
 
-      # @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= 1) # TODO: Why does this help the solver?
-      @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= on(eq, d)) # Slightly stronger than writing currentProduct <= on for each product separately.
+      @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= 1) # TODO: Why does this help the solver?
+      @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= on(eq, d)) # Stronger than writing currentProduct <= on for each product separately.
 
       for p in products(eq)
         if min(maxFlowIn, maxBatchSize(p, eq)) != max(minFlowIn, minBatchSize(p, eq))
@@ -292,14 +292,18 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     # A batch equipment can only have inputs when it starts.
     maxFlowIn = min(maximumProduction(eq), minimum([maxBatchSize(p, eq) for p in products(eq)]))
     minFlowIn = max(minimumProduction(eq), maximum([minBatchSize(p, eq) for p in products(eq)]))
-    @constraint(m, sum([flowIn(eq, d, p) for p in products(eq)]) <= maxFlowIn * start(eq, d))
+    for p in products(eq)
+      @constraint(m, flowIn(eq, d, p) <= maxFlowIn * start(eq, d))
+    end
 
     # TODO: Factor this out for stoppable processes!
     # Limit the quantity within the process when it is off, either globally or per product.
     if nProducts(eq) > 1
       # A batch equipement can only have contents when it is on.
       if minimumProduction(eq) != maxFlowIn
-        @constraint(m, sum([quantity(eq, d, p) for p in products(eq)]) <= maxFlowIn * on(eq, d))
+        for p in products(eq)
+          @constraint(m, quantity(eq, d, p) <= maxFlowIn * on(eq, d))
+        end
         if minimumProduction(eq) > 0.
           @constraint(m, sum([quantity(eq, d, p) for p in products(eq)]) >= minimumProduction(eq) * on(eq, d))
         end
@@ -309,8 +313,9 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
 
       # The contents of the equipment are limited by the heat size.
       for p in products(eq)
-        if min(maximumProduction(eq), maxBatchSize(p, eq)) != minBatchSize(p, eq)
-          @constraint(m, quantity(eq, d, p) <= min(maximumProduction(eq), maxBatchSize(p, eq)) * currentProduct(eq, d, p))
+        maxFlowInP = min(maximumProduction(eq), maxBatchSize(p, eq))
+        if maxFlowInP != minBatchSize(p, eq)
+          @constraint(m, quantity(eq, d, p) <= maxFlowInP * currentProduct(eq, d, p))
           if minBatchSize(p, eq) > 0.
             @constraint(m, quantity(eq, d, p) >= minBatchSize(p, eq) * currentProduct(eq, d, p))
           end
@@ -338,17 +343,13 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
       @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == 0.)
     else
       if maxFlowIn != minFlowIn
-        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
+        for p in products(eq)
+          @constraint(m, flowOut(eq, d, p) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
+        end
         @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= transformationRate(eq) * minFlowIn * stop(eq, d))
       else
         @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
       end
-      # if maxFlowIn != minFlowIn
-      #   @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) <= maxFlowIn * stop(eq, d) / transformationRate(eq))
-      #   @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= minFlowIn * stop(eq, d) / transformationRate(eq))
-      # else
-      #   @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == maxFlowIn * stop(eq, d) / transformationRate(eq))
-      # end
     end
   end
 end
@@ -357,13 +358,13 @@ function postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel)
   for d in eachTimeStep(eq)
     # At most one product at a time.
     # TODO: Should be implied by the equipment constraints.
-    # @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= 1)
+    @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= 1)
 
     # The actual constraints are in the order book.
   end
 end
 
-function postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 1}) # TODO: First eqs, then hrm? 
+function postConstraints(m::Model, hrm::TimingModel, eqs::Array{EquipmentModel, 1}) # TODO: Change order of parameters? First eqs, then hrm? This constraint belongs more to time rather than to equipment, in some sense. 
   # A shift is open only if at least one equipment is used during that shift.
   # Otherwise, if the shifts have negative coefficients in the objective, the solver is free to open shifts, even though
   # no one is working at that time.

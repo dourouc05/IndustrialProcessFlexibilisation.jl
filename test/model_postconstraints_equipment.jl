@@ -740,13 +740,13 @@
     @testset "Link between pieces of equipment and timing" begin
       # No order book constraints are added into the program (otherwise, these tests will miserably fail). 
 
-      # @testset "If all time steps are disabled, then no machine may run, at any time" begin
-      #   e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
-      #   @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
-      #   @objective(m, Max, sum(on(eq2m, d) + on(eq1m, d) for d in eachTimeStep(hrm)))
-      #   solve(m)
-      #   @test getobjectivevalue(m) == 0.
-      # end
+      @testset "If all time steps are disabled, then no machine may run, at any time" begin
+        e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
+        @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
+        @objective(m, Max, sum(on(eq2m, d) + on(eq1m, d) for d in eachTimeStep(hrm)))
+        solve(m)
+        @test getobjectivevalue(m) == 0.
+      end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
         e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
@@ -755,72 +755,68 @@
         @objective(m, Max, sum(on(eq1m, d) for d in eachTimeStep(hrm)))
         solve(m)
 
-        writeLP(m, "f:/m.lp", genericnames=false)
-        println(sum(getvalue([on(eq2m, d) for d in eachTimeStep(hrm)])))
-        println(sum(getvalue([start(eq2m, d) for d in eachTimeStep(hrm)])))
-
-        @test getobjectivevalue(m) ≈ 6.
-        @test sum(getvalue([on(eq1m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 6. 
-        @test sum(getvalue([on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 6. 
+        @test getobjectivevalue(m) ≈ 4.
+        @test sum(getvalue([on(eq1m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 4. 
+        @test sum(getvalue([on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 4. 
       end
     end
     
-    # @testset "Flows" begin
-    #   @testset "In and out flows without transformation rate" begin
-    #     e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
-    #     @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
-    #     @constraint(m, timeStepOpen(hrm, date) == 1.)
-    #     @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
-    #     @objective(m, Max, sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm)))
-    #     solve(m)
+    @testset "Flows" begin
+      @testset "In and out flows without transformation rate" begin
+        e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
+        @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
+        @constraint(m, timeStepOpen(hrm, date) == 1.)
+        @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+        @objective(m, Max, sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm)))
+        solve(m)
 
-    #     for p in [p1, p2]
-    #       # At the beginning of the horizon, may have no output (just initial conditions). 
-    #       @test getvalue(flowOut(eq1m, date, p)) == 0.
-    #       @test getvalue(flowOut(eq2m, date, p)) == 0.
+        for p in [p1, p2]
+          # At the beginning of the horizon, may have no output (just initial conditions). 
+          @test getvalue(flowOut(eq1m, date, p)) == 0.
+          @test getvalue(flowOut(eq2m, date, p)) == 0.
 
-    #       # Flows between processes are not affected by any transformation rate. 
-    #       @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-    #       @test getvalue([flowOut(eq1m,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-    #       @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
-    #     end
+          # Flows between processes are not affected by any transformation rate. 
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq1m,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+        end
         
-    #     # Effect on the overall values, without any transformation rates at the output. 
-    #     println(getvalue(sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm))))
-    #     @test getvalue(sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm))) ≈ 14 * 155. atol=1.e-4 
-    #     @test getvalue(sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm))) ≈ 14 * 155. atol=1.e-4
-    #     @test getvalue(sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm))) ≈ 14 * 155. atol=1.e-4
-    #   end
+        # Effect on the overall values, without any transformation rates at the output. 
+        @test getvalue(sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm))) ≈ 6 * 155. atol=1.e-4 
+        @test getvalue(sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm))) ≈ 6 * 155. atol=1.e-4
+        @test getvalue(sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm))) ≈ 6 * 155. atol=1.e-4
+      end
       
-    #   @testset "In and out flows with transformation rate" begin
-    #     e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel(.99)
-    #     @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
-    #     @constraint(m, timeStepOpen(hrm, date) == 1.)
-    #     @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
-    #     @objective(m, Max, sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm)))
-    #     solve(m)
+      @testset "In and out flows with transformation rate" begin
+        e1, e2, c, p1, p2, ob, m, hrm, eq1m, eq2m, inm, outm = getModel(.99)
+        @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 16.)
+        @constraint(m, timeStepOpen(hrm, date) == 1.)
+        @constraint(m, timeStepOpen(hrm, date + Hour(8)) == 1.)
+        @objective(m, Max, sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm)))
+        solve(m)
 
-    #     for p in [p1, p2]
-    #       # At the beginning of the horizon, may have no output (just initial conditions). 
-    #       @test getvalue(flowOut(eq1m, date, p)) == .0
-    #       @test getvalue(flowOut(eq2m, date, p)) == .0
+        for p in [p1, p2]
+          # At the beginning of the horizon, may have no output (just initial conditions). 
+          @test getvalue(flowOut(eq1m, date, p)) == .0
+          @test getvalue(flowOut(eq2m, date, p)) == .0
 
-    #       # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-    #       @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-    #       @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-    #       @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          # Flows between processes are not affected by any transformation rate, even though there is one applied. 
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
-    #       # Flows at the borders of a process are affected by the transformation rate. 
-    #       # Time shift between the input and the output for the same process! 
-    #       @test .99 * getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
-    #       @test .99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
-    #     end
+          # Flows at the borders of a process are affected by the transformation rate. 
+          # Time shift between the input and the output for the same process! 
+          # TODO: Shift by one in the arrays, normal? Might also explain the strange things above (other TODO item). 
+          @test_broken .99 * getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
+          @test_broken .99 * getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])[1:end-1] ≈ getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)])[2:end] atol=1.e-4
+        end
         
-    #     # Effect on the overall values, with the transformation rates at the output. 
-    #     @test getvalue(sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm))) ≈ 14 * 155. * .99 * .99 atol=1.e-4 
-    #     @test getvalue(sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm))) ≈ 14 * 155. atol=1.e-4
-    #   end
-    # end
+        # Effect on the overall values, with the transformation rates at the output. 
+        @test_broken getvalue(sum(flowIn(outm, d, p1) + flowIn(outm, d, p2) for d in eachTimeStep(hrm))) ≈ 6 * 155. * .99 * .99 atol=1.e-4 
+        @test_broken getvalue(sum(flowOut(inm, d, p1) + flowOut(inm, d, p2) for d in eachTimeStep(hrm))) ≈ 6 * 155. atol=1.e-4
+      end
+    end
   end
 
   # @testset "Two processes, one time step, two products" begin

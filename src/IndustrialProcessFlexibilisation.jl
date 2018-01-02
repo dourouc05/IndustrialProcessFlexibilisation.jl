@@ -25,7 +25,7 @@ module IndustrialProcessFlexibilisation
          teamModel, shiftFixedSchedule, shiftsFiveEight,
          modelMultiple, shiftsAsLetters, countShifts, countShiftSequences, findCycles
   # Model data structures, mimicking the previous data structures (model/ds/).
-  export AbstractEquipmentModel, EquipmentModel, ImplicitEquipmentModel, EquipmentModel,
+  export AbstractEquipmentModel, EquipmentModel, ImplicitEquipmentModel, 
          FlowModel,
          OrderBookModel,
          ProductionObjective, ObjectiveCombination, NoObjective, EnergyObjective, HRCostObjective,
@@ -34,8 +34,8 @@ module IndustrialProcessFlexibilisation
   export postConstraints, timing, orderBook
   export equipment, quantityAfter, quantityBefore, quantity, flowIn, flowOut, on, off, start, stop, currentProduct, checkDate, productId,
          origin, destination, timing, orderBook, minimumValue, maximumValue, orderBookDetails,
-         objectiveTimeStep, objectiveShift, objective, objectives, symbols, weights, weight, nObjectives, objectiveObject, objective, symbol, weight, nonzeroObjectives, hasObjective, electricityPrice, hrPrice,
-         timing, shifts, shiftOpen, shiftOpen, timeStepOpen,
+         objectiveTimeStep, objectiveShift, objective, objectives, symbols, weights, weight, nObjectives, objectiveObject, symbol, nonzeroObjectives, hasObjective, electricityPrice, hrPrice,
+         shifts, shiftOpen, timeStepOpen,
          plant, timingModel, equipmentModels, flowModels, orderBookModel, equipmentModel, flowModel, nEquipments
   export ProductionModelResults, HRModelResults
 

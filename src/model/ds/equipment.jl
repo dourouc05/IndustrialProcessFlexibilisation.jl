@@ -32,17 +32,19 @@ struct EquipmentModel <: AbstractEquipmentModel
 
   function EquipmentModel(m::Model, eq::Equipment, timing::Timing, ob::OrderBook)
     # Basic model variables.
-    quantityBefore = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
-    quantityAfter  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
-    flowIn         = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
-    flowOut        = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
-    on             = @variable(m, [t=1:nTimeSteps(timing)], Bin)
+    flowIn  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
+    flowOut = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
+    on      = @variable(m, [t=1:nTimeSteps(timing)], Bin)
 
-    # If a process lasts for more than one time step, it must be started.
+    # If a process lasts for more than one time step, it must be started and have a precise control over its quantities. 
     if nTimeSteps(timing, processTime(eq)) > 1
-      start    = @variable(m, [t=1:nTimeSteps(timing)], Bin)
+      start = @variable(m, [t=1:nTimeSteps(timing)], Bin)
+      quantityBefore = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
+      quantityAfter  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
     else
       start = on
+      quantityBefore = @variable(m, [t=1:0, p=1:0], lowerbound=0)
+      quantityAfter  = @variable(m, [t=1:0, p=1:0], lowerbound=0)
     end
 
     # Allows to make the distinction between the products (if needed).
@@ -58,11 +60,14 @@ struct EquipmentModel <: AbstractEquipmentModel
 
       if nTimeSteps(timing, processTime(eq)) > 1
         setname(start[t], "equipment_start_$(name(eq))_$(t)")
+        
+        for p in 1:nProducts(ob)
+          setname(quantityBefore[t, p], "equipment_quantityBefore_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+          setname(quantityAfter[t, p],  "equipment_quantityAfter_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
+        end
       end
 
       for p in 1:nProducts(ob)
-        setname(quantityBefore[t, p], "equipment_quantityBefore_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
-        setname(quantityAfter[t, p],  "equipment_quantityAfter_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
         setname(flowIn[t, p],  "equipment_flowIn_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
         setname(flowOut[t, p], "equipment_flowOut_$(name(eq))_$(t)" * ((nProducts(ob) == 1) ? "" : "_prod$(p)"))
 
@@ -137,27 +142,41 @@ maxBatchSize(p::Product, eq::EquipmentModel) = maxBatchSize(p, equipment(eq))
 minBatchSize(p::Product, eq::EquipmentModel) = minBatchSize(p, equipment(eq))
 
 # Specific model accessors: low level.
-quantityBefore(eq::EquipmentModel) = eq.quantityBefore
-quantityAfter(eq::EquipmentModel) = eq.quantityAfter
-quantity(eq::EquipmentModel) = eq.quantityAfter
-flowIn(eq::EquipmentModel) = eq.flowIn
-flowOut(eq::EquipmentModel) = eq.flowOut
-on(eq::EquipmentModel) = eq.on
-start(eq::EquipmentModel) = eq.start
-currentProduct(eq::EquipmentModel) = eq.currentProduct
-currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the up/downstream piece of equipment.")
+function checkArray(x::Array{JuMP.Variable, 1})
+  if size(x, 1) == 0
+    error("Working on an empty vector of variables. Are you sure this variable exists for this particular setting?")
+  end
+  return true
+end
+function checkArray(x::Array{JuMP.Variable, 2})
+  if size(x, 1) == 0 || size(x, 2) == 0
+    error("Working on an empty matrix of variables. Are you sure this variable exists for this particular setting?")
+  end
+  return true
+end
+checkReturnArray(x) = checkArray(x) && x
+
+quantityBefore(eq::EquipmentModel) = checkReturnArray(eq.quantityBefore)
+quantityAfter(eq::EquipmentModel) = checkReturnArray(eq.quantityAfter)
+quantity(eq::EquipmentModel) = checkReturnArray(if (nTimeSteps(eq, processTime(eq)) > 1); eq.quantityAfter; else; eq.flowIn; end)
+flowIn(eq::EquipmentModel) = checkReturnArray(eq.flowIn)
+flowOut(eq::EquipmentModel) = checkReturnArray(eq.flowOut)
+on(eq::EquipmentModel) = checkReturnArray(eq.on)
+start(eq::EquipmentModel) = checkReturnArray(eq.start)
+currentProduct(eq::EquipmentModel) = checkReturnArray(eq.currentProduct)
 
 quantityBefore(eq::ImplicitEquipmentModel) = eq.quantity
 quantityAfter(eq::ImplicitEquipmentModel) = eq.quantity
 quantity(eq::ImplicitEquipmentModel) = eq.quantity
+currentProduct(eq::ImplicitEquipmentModel) = error("Implicit equipments do not have a current product variable per se. Use the one of the up/downstream piece of equipment.")
 
+# Specific model accessors: high level.
 quantityBefore(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = quantityBefore(eq)[ts, nProduct]
 quantityAfter(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = quantityAfter(eq)[ts, nProduct]
-quantity(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = eq.quantity[ts, nProduct]
+quantity(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = quantity(eq)[ts, nProduct]
 flowIn(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :out; quantityBefore(eq)[ts, nProduct]; else; error("Implicit in equipment has no flow in."); end
 flowOut(eq::ImplicitEquipmentModel, ts::Int, nProduct::Int) = if kind(equipment(eq)) == :in; quantityAfter(eq)[ts, nProduct]; else; error("Implicit out equipment has no flow out."); end
 
-# Specific model accessors: high level.
 quantityBefore(eq::EquipmentModel, ts::Int, nProduct::Int) = quantityBefore(eq)[ts, nProduct]
 quantityAfter(eq::EquipmentModel, ts::Int, nProduct::Int) = quantityAfter(eq)[ts, nProduct]
 quantity(eq::EquipmentModel, ts::Int, nProduct::Int) = quantity(eq)[ts, nProduct]

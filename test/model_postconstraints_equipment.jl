@@ -64,7 +64,7 @@
         @test getvalue(flowOut(eqm, date, p)) ≈ 0.
 
         # Flows between processes are not affected by any transformation rate. 
-        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(inm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
         @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Effect on the overall values. 

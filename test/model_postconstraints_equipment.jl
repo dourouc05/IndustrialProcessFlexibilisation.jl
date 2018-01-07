@@ -353,7 +353,7 @@
       @testset "If all time steps are disabled, then no machine may run, at any time" begin
         e1, e2, c, p, ob, m, hrm, eq1m, eq2m, inm, outm = getModel()
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
-        @objective(m, Max, sum(on(eq1m, d) + on(eq2m) for d in eachTimeStep(hrm)))
+        @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
         solve(m)
         @test getobjectivevalue(m) ≈ 0.
       end

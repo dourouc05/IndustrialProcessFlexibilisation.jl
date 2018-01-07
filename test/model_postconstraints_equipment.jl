@@ -1,4 +1,6 @@
 @testset "Each piece of equipment" begin
+  eqmFilter = leqm -> collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, leqm)) # Same filtering as in model/production.jl. 
+
   # model/ds/equipment.jl, postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
   @testset "One process, one time step, one product" begin
     date = DateTime(2017, 01, 01, 12, 32, 42)
@@ -19,7 +21,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eqm, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eqm, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eqm, inm, outm]))
       postConstraints(m, eqm, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e, t, ob, maxValue=155.), hrm, eqms)
       postConstraints(m, FlowModel(m, e, outEquipment, t, ob, maxValue=155.), hrm, eqms)
@@ -117,7 +119,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
       postConstraints(m, eq1m, hrm)
       postConstraints(m, eq2m, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=155.), hrm, eqms)
@@ -223,7 +225,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eqm, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eqm, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eqm, inm, outm]))
       postConstraints(m, eqm, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e, t, ob, maxValue=150.), hrm, eqms)
       postConstraints(m, FlowModel(m, e, outEquipment, t, ob, maxValue=150.), hrm, eqms)
@@ -337,7 +339,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
       postConstraints(m, eq1m, hrm)
       postConstraints(m, eq2m, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=150.), hrm, eqms)
@@ -471,7 +473,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eqm, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eqm, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eqm, inm, outm]))
       postConstraints(m, eqm, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e, t, ob, maxValue=155.), hrm, eqms)
       postConstraints(m, FlowModel(m, e, outEquipment, t, ob, maxValue=155.), hrm, eqms)
@@ -574,7 +576,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
       postConstraints(m, eq1m, hrm)
       postConstraints(m, eq2m, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=155.), hrm, eqms)
@@ -683,7 +685,7 @@
         eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
         postConstraints(m, hrm)
-        postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+        postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
         postConstraints(m, eq1m, hrm)
         postConstraints(m, eq2m, hrm)
         postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=150.), hrm, eqms)
@@ -727,7 +729,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
       postConstraints(m, eq1m, hrm)
       postConstraints(m, eq2m, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=155.), hrm, eqms)
@@ -841,7 +843,7 @@
       eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
       postConstraints(m, hrm)
-      postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+      postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
       postConstraints(m, eq1m, hrm)
       postConstraints(m, eq2m, hrm)
       postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=155.), hrm, eqms)
@@ -950,7 +952,7 @@
         eqms = Dict{AbstractString, AbstractEquipmentModel}("in" => inm, "EAF" => eq1m, "LF" => eq2m, "out" => outm)
 
         postConstraints(m, hrm)
-        postConstraints(m, hrm, collect(EquipmentModel, Iterators.filter((e) -> typeof(e) == EquipmentModel, [eq1m, eq2m, inm, outm]))) # Same filtering as in model/production.jl. 
+        postConstraints(m, hrm, eqmFilter([eq1m, eq2m, inm, outm]))
         postConstraints(m, eq1m, hrm)
         postConstraints(m, eq2m, hrm)
         postConstraints(m, FlowModel(m, inEquipment, e1, t, ob, maxValue=150.), hrm, eqms)

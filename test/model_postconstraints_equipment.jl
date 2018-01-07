@@ -35,7 +35,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eqm, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -45,7 +45,7 @@
         solve(m)
 
         @test getobjectivevalue(m) ≈ 8.
-        @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 8. 
+        @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 8. 
       end
     end
     
@@ -59,14 +59,14 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eqm, date, p)) == 0.
+        @test getvalue(flowOut(eqm, date, p)) ≈ 0.
 
         # Flows between processes are not affected by any transformation rate. 
-        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
-        @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Effect on the overall values. 
-        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == 16 * 155.
+        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 155.
         @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 155. atol=1.e-5
       end
       
@@ -79,11 +79,11 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eqm, date, p)) == .0
+        @test getvalue(flowOut(eqm, date, p)) ≈ .0
 
         # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
-        @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Flows at the borders of a process are affected by the transformation rate. 
         # Time shift between the input and the output for the same process! 
@@ -135,7 +135,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -149,7 +149,7 @@
         @test getobjectivevalue(m) ≈ 2 * 8. - 1
         # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
         # and 1*0 or 1*1 for the two allowed ones). 
-        @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 
+        @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 15. 
       end
     end
 
@@ -163,15 +163,15 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eq1m, date, p)) == .0
+        @test getvalue(flowOut(eq1m, date, p)) ≈ .0
 
         # Flows between processes are not affected by any transformation rate. 
-        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-        @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-        @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Effect on the overall values. 
-        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == 15 * 155.
+        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ 15 * 155.
         @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 15 * 155. atol=1.e-5
       end
 
@@ -184,12 +184,12 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eq1m, date, p)) == .0
+        @test getvalue(flowOut(eq1m, date, p)) ≈ .0
 
         # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-        @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-        @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+        @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Flows at the borders of a process are affected by the transformation rate. 
         # Time shift between the input and the output for the same process! 
@@ -239,7 +239,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eqm, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -258,12 +258,12 @@
         @objective(m, Min, sum(on(eqm, d) for d in eachTimeStep(hrm)))
         solve(m)
 
-        @test getvalue(start(eqm, date + Hour(1))) == 0. # Cannot yet start, not yet finished. 
-        @test getvalue(on(eqm, date)) == 1. # Must be on, as started this time step. 
-        @test getvalue(on(eqm, date + Hour(1))) == 1. # Must be on, as started one time step ago (the process lasts two time steps). 
-        @test getvalue(on(eqm, date + Hour(2))) == 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
+        @test getvalue(start(eqm, date + Hour(1))) ≈ 0. # Cannot yet start, not yet finished. 
+        @test getvalue(on(eqm, date)) ≈ 1. # Must be on, as started this time step. 
+        @test getvalue(on(eqm, date + Hour(1))) ≈ 1. # Must be on, as started one time step ago (the process lasts two time steps). 
+        @test getvalue(on(eqm, date + Hour(2))) ≈ 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
         # and minimising the number of time steps where the process is on. 
-        @test getvalue(on(eqm, date + Hour(3))) == 0.
+        @test getvalue(on(eqm, date + Hour(3))) ≈ 0.
       end
     end
     
@@ -277,14 +277,14 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eqm, date, p)) == 0.
+        @test getvalue(flowOut(eqm, date, p)) ≈ 0.
 
         # Flows between processes are not affected by any transformation rate. 
         @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
         @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Effect on the overall values. 
-        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == 16 * 150. / 2
+        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 150. / 2
         @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ 16 * 150. / 2 atol=1.e-5
       end
       
@@ -297,7 +297,7 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eqm, date, p)) == .0
+        @test getvalue(flowOut(eqm, date, p)) ≈ .0
 
         # Flows between processes are not affected by any transformation rate, even though there is one applied. 
         @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
@@ -355,7 +355,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eq1m, d) + on(eq2m) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -379,24 +379,24 @@
         solve(m)
 
         # First process. 
-        @test getvalue(start(eq1m, date + Hour(1))) == 0. # Cannot yet start, not yet finished. 
-        @test getvalue(on(eq1m, date)) == 1. # Must be on, as started this time step. 
-        @test getvalue(on(eq1m, date + Hour(1))) == 1. # Must be on, as started one time step ago (the process lasts two time steps). 
-        @test getvalue(on(eq1m, date + Hour(2))) == 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
+        @test getvalue(start(eq1m, date + Hour(1))) ≈ 0. # Cannot yet start, not yet finished. 
+        @test getvalue(on(eq1m, date)) ≈ 1. # Must be on, as started this time step. 
+        @test getvalue(on(eq1m, date + Hour(1))) ≈ 1. # Must be on, as started one time step ago (the process lasts two time steps). 
+        @test getvalue(on(eq1m, date + Hour(2))) ≈ 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
         # and minimising the number of time steps where the process is on. 
-        @test getvalue(on(eq1m, date + Hour(3))) == 0.
-        @test getvalue(on(eq1m, date + Hour(4))) == 0.
-        @test getvalue(on(eq1m, date + Hour(5))) == 0.
+        @test getvalue(on(eq1m, date + Hour(3))) ≈ 0.
+        @test getvalue(on(eq1m, date + Hour(4))) ≈ 0.
+        @test getvalue(on(eq1m, date + Hour(5))) ≈ 0.
         
         # Second process. 
-        @test getvalue(on(eq2m, date)) == 0. # Cannot yet start, first process not yet finished. 
-        @test getvalue(on(eq2m, date + Hour(1))) == 0. # Cannot yet start, first process not yet finished. 
-        @test getvalue(start(eq2m, date)) == 0. # Cannot yet start, not yet finished. 
-        @test getvalue(on(eq2m, date + Hour(2))) == 1. # Must be on, as started this time step. 
-        @test getvalue(on(eq2m, date + Hour(3))) == 1. # Must be on, as started one time step ago (the process lasts two time steps). 
-        @test getvalue(on(eq2m, date + Hour(4))) == 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
+        @test getvalue(on(eq2m, date)) ≈ 0. # Cannot yet start, first process not yet finished. 
+        @test getvalue(on(eq2m, date + Hour(1))) ≈ 0. # Cannot yet start, first process not yet finished. 
+        @test getvalue(start(eq2m, date)) ≈ 0. # Cannot yet start, not yet finished. 
+        @test getvalue(on(eq2m, date + Hour(2))) ≈ 1. # Must be on, as started this time step. 
+        @test getvalue(on(eq2m, date + Hour(3))) ≈ 1. # Must be on, as started one time step ago (the process lasts two time steps). 
+        @test getvalue(on(eq2m, date + Hour(4))) ≈ 0. # Must be off, as started two time steps ago (the process lasts two time steps) 
         # and minimising the number of time steps where the process is on. 
-        @test getvalue(on(eq2m, date + Hour(5))) == 0.
+        @test getvalue(on(eq2m, date + Hour(5))) ≈ 0.
       end
     end
     
@@ -410,8 +410,8 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eq1m, date, p)) == 0.
-        @test getvalue(flowOut(eq2m, date, p)) == 0.
+        @test getvalue(flowOut(eq1m, date, p)) ≈ 0.
+        @test getvalue(flowOut(eq2m, date, p)) ≈ 0.
 
         # Flows between processes are not affected by any transformation rate. 
         @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
@@ -419,7 +419,7 @@
         @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
         # Effect on the overall values. 
-        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) == (16 - 2) * 150. / 2
+        @test getvalue(sum(flowIn(outm, d, p) for d in eachTimeStep(hrm))) ≈ (16 - 2) * 150. / 2
         @test getvalue(sum(flowOut(inm, d, p) for d in eachTimeStep(hrm))) ≈ ((16 - 2) * 150. / 2) atol=1.e-5
       end
       
@@ -432,7 +432,7 @@
         solve(m)
 
         # At the beginning of the horizon, may have no output (just initial conditions). 
-        @test getvalue(flowOut(eq2m, date, p)) == .0
+        @test getvalue(flowOut(eq2m, date, p)) ≈ .0
 
         # Flows between processes are not affected by any transformation rate, even though there is one applied. 
         @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
@@ -487,7 +487,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eqm, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -497,7 +497,7 @@
         solve(m)
 
         @test getobjectivevalue(m) ≈ 8.
-        @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 8. 
+        @test sum(getvalue([on(eqm, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 8. 
       end
     end
     
@@ -512,11 +512,11 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eqm, date, p)) == 0.
+          @test getvalue(flowOut(eqm, date, p)) ≈ 0.
 
           # Flows between processes are not affected by any transformation rate. 
-          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
         end
         
         # Effect on the overall values, without any transformation rates at the output. 
@@ -534,11 +534,11 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eqm, date, p)) == .0
+          @test getvalue(flowOut(eqm, date, p)) ≈ .0
 
           # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eqm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eqm, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
           # Flows at the borders of a process are affected by the transformation rate. 
           # Time shift between the input and the output for the same process! 
@@ -592,7 +592,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -606,7 +606,7 @@
         @test getobjectivevalue(m) ≈ 2 * 8. - 1
         # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
         # and 1*0 or 1*1 for the two allowed ones). 
-        @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 
+        @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 15. 
       end
     end
 
@@ -621,12 +621,12 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eq1m, date, p)) == .0
+          @test getvalue(flowOut(eq1m, date, p)) ≈ .0
 
           # Flows between processes are not affected by any transformation rate. 
-          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
         end
 
         # Effect on the overall values, without any transformation rates at the output. 
@@ -644,12 +644,12 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eq1m, date, p)) == .0
+          @test getvalue(flowOut(eq1m, date, p)) ≈ .0
 
           # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
           # Flows at the borders of a process are affected by the transformation rate. 
           # Time shift between the input and the output for the same process! 
@@ -745,7 +745,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eq2m, d) + on(eq1m, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -756,8 +756,8 @@
         solve(m)
 
         @test getobjectivevalue(m) ≈ 4.
-        @test sum(getvalue([on(eq1m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 4. 
-        @test sum(getvalue([on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 4. 
+        @test sum(getvalue([on(eq1m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 4. 
+        @test sum(getvalue([on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 4. 
       end
     end
     
@@ -772,8 +772,8 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eq1m, date, p)) == 0.
-          @test getvalue(flowOut(eq2m, date, p)) == 0.
+          @test getvalue(flowOut(eq1m, date, p)) ≈ 0.
+          @test getvalue(flowOut(eq2m, date, p)) ≈ 0.
 
           # Flows between processes are not affected by any transformation rate. 
           @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
@@ -797,8 +797,8 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eq1m, date, p)) == .0
-          @test getvalue(flowOut(eq2m, date, p)) == .0
+          @test getvalue(flowOut(eq1m, date, p)) ≈ .0
+          @test getvalue(flowOut(eq2m, date, p)) ≈ .0
 
           # Flows between processes are not affected by any transformation rate, even though there is one applied. 
           @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
@@ -859,7 +859,7 @@
         @constraint(m, sum(timeStepOpen(hrm, d) for d in eachTimeStep(hrm)) == 0.)
         @objective(m, Max, sum(on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)))
         solve(m)
-        @test getobjectivevalue(m) == 0.
+        @test getobjectivevalue(m) ≈ 0.
       end
 
       @testset "If one time step is allowed, then the machines may run at that time step" begin
@@ -873,7 +873,7 @@
         @test getobjectivevalue(m) ≈ 2 * 8. - 1
         # Both machines are on when the time steps are allowed (i.e. the summed elements must be zero for the non-allowed time steps, 
         # and 1*0 or 1*1 for the two allowed ones). 
-        @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) == 15. 
+        @test sum(getvalue([on(eq1m, d) + on(eq2m, d) for d in eachTimeStep(hrm)]) .* getvalue([timeStepOpen(hrm, d) for d in eachTimeStep(hrm)])) ≈ 15. 
       end
     end
 
@@ -888,12 +888,12 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eq1m, date, p)) == .0
+          @test getvalue(flowOut(eq1m, date, p)) ≈ .0
 
           # Flows between processes are not affected by any transformation rate. 
-          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
         end
 
         # Effect on the overall values, without any transformation rates at the output. 
@@ -911,12 +911,12 @@
 
         for p in [p1, p2]
           # At the beginning of the horizon, may have no output (just initial conditions). 
-          @test getvalue(flowOut(eq1m, date, p)) == .0
+          @test getvalue(flowOut(eq1m, date, p)) ≈ .0
 
           # Flows between processes are not affected by any transformation rate, even though there is one applied. 
-          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
-          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) == getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(inm,  d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq1m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq1m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(eq2m, d, p) for d in eachTimeStep(hrm)])
+          @test getvalue([flowOut(eq2m, d, p) for d in eachTimeStep(hrm)]) ≈ getvalue([flowIn(outm, d, p) for d in eachTimeStep(hrm)])
 
           # Flows at the borders of a process are affected by the transformation rate. 
           # Time shift between the input and the output for the same process! 

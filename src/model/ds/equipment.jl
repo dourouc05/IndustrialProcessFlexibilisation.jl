@@ -32,8 +32,8 @@ struct EquipmentModel <: AbstractEquipmentModel
 
   function EquipmentModel(m::Model, eq::Equipment, timing::Timing, ob::OrderBook)
     # Basic model variables.
-    quantityBefore = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound= 0)
-    quantityAfter  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound= 0)
+    quantityBefore = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
+    quantityAfter  = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
     flowIn         = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
     flowOut        = @variable(m, [t=1:nTimeSteps(timing), p=1:nProducts(ob)], lowerbound=0)
     on             = @variable(m, [t=1:nTimeSteps(timing)], Bin)
@@ -356,9 +356,9 @@ end
 
 function postConstraints(m::Model, eq::ImplicitEquipmentModel, hrm::TimingModel) 
   for d in eachTimeStep(eq)
-    # At most one product at a time.
-    # TODO: Should be implied by the equipment constraints.
-    @constraint(m, sum([currentProduct(eq, d, p) for p in products(eq)]) <= 1)
+    # At most one product at a time. This is implied by the other parts of the model, the implicit pieces of equipment being agnostic: 
+    # they are made to receive the production of the whole plant, which is not forced to produce only one thing at a time if it 
+    # has equipment to produce different goods. 
 
     # The actual constraints are in the order book.
   end

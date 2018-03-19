@@ -253,7 +253,9 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     # TODO: Only for non-continuous processes when they have a duration over one time step.
     # TODO: A similar version can be written for processes with a minimum and a maximum up time per batch. 
     # If the process starts n times, then it must be on n * processTime.
-    @constraint(m, nTimeSteps(eq, processTime(eq)) * sum(start(eq, d) for d in eachTimeStep(eq)) == sum(on(eq, d) for d in eachTimeStep(eq)))
+    if nTimeSteps(eq, processTime(eq)) > 1
+      @constraint(m, nTimeSteps(eq, processTime(eq)) * sum(start(eq, d) for d in eachTimeStep(eq)) == sum(on(eq, d) for d in eachTimeStep(eq)))
+    end
 
     # The process may only be running or starting when the current time step is allowed. 
     # TODO: How to split this among the various components? Just for processes that are not continuous or at least stoppable. 
@@ -269,7 +271,7 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
     if nTimeSteps(eq, processTime(eq)) > 1
       for p in products(eq)
         if d > timeBeginning(eq)
-          @constraint(m, quantityBefore(eq, d, p) == quantity(eq, d - timeStepDuration(eq), p) - flowOut(eq, d, p) / transformationRate(eq))
+          @constraint(m, quantityBefore(eq, d, p) == quantityAfter(eq, d - timeStepDuration(eq), p) - flowOut(eq, d, p) / transformationRate(eq))
           @constraint(m, quantityAfter(eq, d, p) == quantityBefore(eq, d, p) + flowIn(eq, d, p))
         elseif d == timeBeginning(eq) # TODO: handle the time step before optimisation! I.e. initial conditions. For now, was empty.
           @constraint(m, quantity(eq, d, p) == flowIn(eq, d, p))
@@ -357,17 +359,33 @@ function postConstraints(m::Model, eq::EquipmentModel, hrm::TimingModel)
 
     # TODO: Factor this out for batch processes!
     # A batch equipment can only have outputs when it is done.
-    if d - processTime(eq) < timeBeginning(eq)
-      # TODO: Initial conditions to replace the zero. 
-      @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == 0.)
-    else
-      if maxFlowIn != minFlowIn
-        for p in products(eq)
-          @constraint(m, flowOut(eq, d, p) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
-        end
-        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= transformationRate(eq) * minFlowIn * stop(eq, d))
+    if nTimeSteps(eq, processTime(eq)) == 1
+      if d <= timeBeginning(eq)
+        # TODO: Initial conditions to replace the zero. 
+        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == 0.)
       else
-        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
+        if maxFlowIn != minFlowIn
+          for p in products(eq)
+            @constraint(m, flowOut(eq, d, p) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
+          end
+          @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= transformationRate(eq) * minFlowIn * stop(eq, d))
+        else
+          @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
+        end
+      end
+    else
+      if d - processTime(eq) < timeBeginning(eq)
+        # TODO: Initial conditions to replace the zero. 
+        @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == 0.)
+      else
+        if maxFlowIn != minFlowIn
+          for p in products(eq)
+            @constraint(m, flowOut(eq, d, p) <= transformationRate(eq) * maxFlowIn * stop(eq, d))
+          end
+          @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) >= transformationRate(eq) * minFlowIn * stop(eq, d))
+        else
+          @constraint(m, sum([flowOut(eq, d, p) for p in products(eq)]) == transformationRate(eq) * maxFlowIn * stop(eq, d))
+        end
       end
     end
   end
